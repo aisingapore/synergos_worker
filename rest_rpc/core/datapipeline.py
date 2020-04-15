@@ -61,10 +61,12 @@ class Preprocessor:
         output (pd.DataFrame): Processed data (with interpolations applied)
     """
 
-    def __init__(self, data, schema, seed=42, boost_iter=100, train_dir=None):
+    def __init__(self, data, schema, 
+                 seed=42, boost_iter=100, train_dir=None, thread_count=None):
         random.seed(seed)
         IPARAMS = {'iterations': boost_iter,
                    'random_seed': seed,
+                   'thread_count': thread_count,
                    'logging_level': 'Silent',
                    'train_dir': train_dir}
         self.__cat_interpolator = cat.CatBoostClassifier(**IPARAMS)

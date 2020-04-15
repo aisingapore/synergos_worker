@@ -1,0 +1,48 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "File paths to all exported aggregated + interpolated datasets.",
+    "description": "Paths to all exported tensors",
+    "type": "object",
+    "definitions": {
+
+        "exports": {
+            "description": "Paths to all exported tensors",
+            "type": "object",
+            "train": {
+                "description": "Paths to exported aggregated + interpolated training datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"}
+                }
+            },
+    
+            "evaluate": {
+                "description": "Paths to exported aggregated + interpolated evaluation datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"}
+                }
+            },
+    
+            "predict": {
+                "description": "Paths to exported aggregated + interpolated prediction datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"}
+                }
+            }
+        }
+    },
+
+    "properties": {
+
+        "train": {"$ref": "#/definitions/exports/train"},
+        "evaluate": {"$ref": "#/definitions/exports/evaluate"},
+        "predict": {"$ref": "#/definitions/exports/predict"}
+    },
+
+    "required": ["train"]
+}

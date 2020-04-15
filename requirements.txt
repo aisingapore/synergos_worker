@@ -2,6 +2,7 @@ catboost==0.19.1
 diffprivlib==0.1.1
 flask==1.1.1
 flask-restx==0.1.1
+jsonschema==3.2.0 
 numpy==1.18.1
 pandas==0.25.3
 pytorch-ignite==0.3.0

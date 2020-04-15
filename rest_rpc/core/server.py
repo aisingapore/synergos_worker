@@ -21,8 +21,8 @@ import torch as th
 from syft.workers.websocket_server import WebsocketServerWorker
 
 # Custom
-from datapipeline import Preprocessor
-from config import server_params
+from rest_rpc import app
+from rest_rpc.core.datapipeline import Preprocessor
 
 ##################
 # Configurations #
@@ -32,19 +32,19 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hook = sy.TorchHook(th, is_client=True) # used by end-user
 
-data_dir = server_params['data_dir']
-out_dir = server_params['out_dir']
+data_dir = app.config['DATA_DIR']
+out_dir = app.config['OUT_DIR']
 
 #############
 # Functions #
 #############
 
-def load_dataset(tag):
+def load_dataset(tag, out_dir=out_dir):
     """ Loads in all datasets found in the specified tagged directory.
         Note: A tag is defined as a list of n tokens, each token corresponding
-              to a sub-classification of datasets
-              eg. ["type_A", "v1"] corresponds to "~/data/type_A/v1/data.csv"
-                  ["type_B"] corresponds to "~/data/type_B/data.csv"
+            to a sub-classification of datasets
+            eg. ["type_A", "v1"] corresponds to "~/data/type_A/v1/data.csv"
+                ["type_B"] corresponds to "~/data/type_B/data.csv"
 
     Args:
         tag (list(str)): Tag of dataset to load into worker
@@ -92,7 +92,7 @@ def load_dataset(tag):
         raise RuntimeError("No valid datasets were detected!")
 
 
-def load_and_combine(tags):
+def load_and_combine(tags, out_dir=out_dir):
     """ Loads in all datasets found along the corresponding subdirectory
         sequence defined by the specified tags, and combines them into a single
         unified dataset.
@@ -102,9 +102,7 @@ def load_and_combine(tags):
                        declared datatypes
     
     Args:
-        id   (str): Identifier of the worker
         tag  (list(list(str))): Tags of datasets to load into worker
-        meta (str): Metadata to annotate loaded tensors
     Returns:
         X_combined_tensor (th.Tensor)
         y_combined_tensor (th.Tensor)
@@ -112,7 +110,8 @@ def load_and_combine(tags):
         y_header (list(str))
         Combined Schema (dict(str))
     """
-    tag_unified_datasets = [load_dataset(tag=tag) for tag in tags]
+    tag_unified_datasets = [load_dataset(tag=tag, out_dir=out_dir) 
+                            for tag in tags]
 
     combined_schema = {}
     for df in tag_unified_datasets:
@@ -169,7 +168,7 @@ def annotate(X, y, id, meta):
     return X_annotated, y_annotated
 
 
-def start_proc(participant=WebsocketServerWorker, **kwargs):
+def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     """ helper function for spinning up a websocket participant 
     
     Args:
@@ -225,7 +224,7 @@ def start_proc(participant=WebsocketServerWorker, **kwargs):
     final_datasets = tuple()
     for meta, tags in all_tags.items():
 
-        X, y, _, _, _ = load_and_combine(tags=tags)
+        X, y, _, _, _ = load_and_combine(tags=tags, out_dir=out_dir)
 
         feature_alignment = all_alignments[meta]['X']
         X_aligned = align_dataset(X, feature_alignment)
@@ -269,7 +268,7 @@ def start_proc(participant=WebsocketServerWorker, **kwargs):
 if __name__ == "__main__":
     
     tags = [["edge_test_missing_coecerable_vals"], ["edge_test_misalign"]]
-    print(load_and_combine("Alice", tags, "train"))
+    print(load_and_combine(tags))
     
     """
     parser = argparse.ArgumentParser(description="Run websocket server worker.")

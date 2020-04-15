@@ -9,6 +9,6 @@ WORKDIR /worker
 EXPOSE 5000
 EXPOSE 8020
 
-ENTRYPOINT ["python", "./initialise_server.py"]
+ENTRYPOINT ["python", "./main.py"]
 
 CMD ["--help"]
