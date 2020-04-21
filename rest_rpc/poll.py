@@ -71,10 +71,11 @@ xy_sequence_model = ns_api.model(
 header_model = ns_api.model(
     name="headers",
     model={
-        'train': fields.Nested(xy_sequence_model),
-        'evaluate': fields.Nested(xy_sequence_model),
-        'predict': fields.Nested(xy_sequence_model),
-    }
+        'train': fields.Nested(xy_sequence_model, required=True),
+        'evaluate': fields.Nested(xy_sequence_model, skip_none=True),
+        'predict': fields.Nested(xy_sequence_model, skip_none=True)
+    },
+    skip_none=True
 )
 
 schema_field = fields.Wildcard(fields.String())
@@ -87,8 +88,8 @@ schema_model = ns_api.model(
     name="schema",
     model={
         'train': fields.Nested(meta_model, required=True),
-        'evaluate': fields.Nested(meta_model, required=True),
-        'predict': fields.Nested(meta_model, required=True)
+        'evaluate': fields.Nested(meta_model, skip_none=True),
+        'predict': fields.Nested(meta_model, skip_none=True)
     }
 )
 
@@ -179,8 +180,10 @@ class Poll(Resource):
                 }
             }
         """
+        logging.debug(request.json)
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
+        print(retrieved_metadata)
 
         # If polling operation had already been done before, skip preprocessing
         # (Note: this is only valid if the submitted set of tags are the same)
