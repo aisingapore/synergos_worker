@@ -1,6 +1,7 @@
-FROM python:3.6.9-buster
+FROM python:3.7.4-slim-buster
 
 COPY requirements.txt ./
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 ADD . /worker

@@ -160,7 +160,7 @@ class Initialisation(Resource):
         """ 
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
-        
+
         if retrieved_metadata:
 
             # Check that specified experiment run is not already running
@@ -179,6 +179,8 @@ class Initialisation(Resource):
             else:
                 # Resource already exists   --> 200
                 status = 200
+
+            logging.info(f"Initialisation - Current state of Cache: {cache}")
 
             retrieved_metadata['is_live'] = cache[project_id]['process'].is_alive()
             

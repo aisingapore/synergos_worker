@@ -5,8 +5,10 @@
 ####################
 
 # Generic/Built-in
+import asyncio
 import logging
 import os
+import signal
 from pathlib import Path
 
 # Libs
@@ -62,7 +64,7 @@ class Termination(Resource):
 
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
-        
+                
         if (retrieved_metadata and 
             expt_run_key in retrieved_metadata['in_progress']):
 
@@ -83,12 +85,17 @@ class Termination(Resource):
                     )
 
                 if wssw_process.is_alive():
-                    wssw_process.terminate()    # end the process
+                    #wssw_process.terminate()    # end the process
+                    wssw_process.kill()
+                    logging.info(f"Terminated process id: {wssw_process.pid}")
+                    logging.info(f"Terminated process exitcode: {wssw_process.exitcode}")
                     wssw_process.join()         # reclaim resources from thread
 
                 assert not wssw_process.is_alive()
                 assert not wss_worker.loop.is_running()
                 retrieved_metadata['is_live'] = False
+
+            logging.info(f"Termination - Current state of Cache: {cache}")
 
             retrieved_metadata['in_progress'].remove(expt_run_key)
 

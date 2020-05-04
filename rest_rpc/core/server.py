@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from glob import glob
-from multiprocessing import Process
+from multiprocessing import Event, Process
 from pathlib import Path
 
 # Libs
@@ -30,7 +30,7 @@ from rest_rpc.core.datapipeline import Preprocessor
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
-hook = sy.TorchHook(th, is_client=True) # used by end-user
+hook = sy.TorchHook(th, is_client=False) # used by end-user
 
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
@@ -256,6 +256,7 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     # The initialised loop is then fed into WSSW as a custom governing loop
     kwargs.update({'loop': loop})
     server = participant(hook=hook, **kwargs)
+    server.broadcast_queue = asyncio.Queue(loop=loop)
 
     p = Process(target=target, args=(server,))
 
