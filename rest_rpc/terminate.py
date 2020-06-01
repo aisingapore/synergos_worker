@@ -14,6 +14,7 @@ from pathlib import Path
 # Libs
 import jsonschema
 import numpy as np
+import websockets
 from flask import request
 from flask_restx import Namespace, Resource, fields
 
@@ -73,9 +74,10 @@ class Termination(Resource):
             if len(retrieved_metadata['in_progress']) == 1:
 
                 project = cache.pop(project_id)
-
                 wssw_process = project['process']
                 wss_worker = project['participant']
+
+                wss_worker.remove_worker_from_local_worker_registry()
 
                 if wss_worker.loop.is_running():
                     wss_worker.loop.call_soon_threadsafe(
@@ -83,16 +85,16 @@ class Termination(Resource):
                     ).call_soon_threadsafe(
                         wss_worker.loop.close
                     )
-
+                    assert not wss_worker.loop.is_running()
+                    
                 if wssw_process.is_alive():
-                    #wssw_process.terminate()    # end the process
-                    wssw_process.kill()
+                    wssw_process.terminate()    # end the process
+                    wssw_process.join()         # reclaim resources from thread
                     logging.info(f"Terminated process id: {wssw_process.pid}")
                     logging.info(f"Terminated process exitcode: {wssw_process.exitcode}")
-                    wssw_process.join()         # reclaim resources from thread
+                    assert not wssw_process.is_alive()
+                    wssw_process.close()  
 
-                assert not wssw_process.is_alive()
-                assert not wss_worker.loop.is_running()
                 retrieved_metadata['is_live'] = False
 
             logging.info(f"Termination - Current state of Cache: {cache}")
