@@ -118,7 +118,7 @@ logging.debug(f"Cache initialised: {CACHE}")
 In PySyft worker, the database is used mainly for caching results of operations
 triggered by the TTP's REST-RPC calls
 """
-DB_PATH = os.path.join(SRC_DIR, "data", "database.json")
+DB_PATH = os.path.join(SRC_DIR, "outputs", "operations.json")
 
 logging.debug(f"Database path detected: {DB_PATH}")
 
