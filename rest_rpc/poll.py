@@ -210,9 +210,7 @@ class Poll(Resource):
                         )
                         os.makedirs(meta_out_dir, exist_ok=True)
 
-                        (X_tensor, y_tensor, 
-                            X_header, y_header,
-                            schema
+                        (X_tensor, y_tensor, X_header, y_header, schema
                         ) = load_and_combine(tags=tags, out_dir=meta_out_dir)
 
                         # Export X & y tensors for subsequent use

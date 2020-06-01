@@ -187,15 +187,8 @@ class Preprocessor:
         Returns:
             Feature-complete segment (pd.DataFrame)
         """
-        # Replace all "?" & "-9.0" with NAN values
-        # (This operation is unique to dataset, subjected to changes)
-        data = df.replace(
-            [-9.0, '?'], np.nan
-        ).replace(
-            {'ca': 9, 'slope': 0, 'thal': [1,2,5]}, np.nan
-        )
-        feature_vals = data[feature]
-        data = data.dropna(axis=1)
+        feature_vals = df[feature]
+        data = df.dropna(axis=1)
         data[feature] = feature_vals
         feature_complete_segment = data[~data[feature].isnull()]
         return feature_complete_segment.dropna(axis=1)

@@ -30,7 +30,7 @@ from rest_rpc.core.datapipeline import Preprocessor
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
-hook = sy.TorchHook(th, is_client=False) # used by end-user
+hook = sy.TorchHook(th, verbose=False) # toggle where necessary
 
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
@@ -70,7 +70,48 @@ def load_dataset(tag, out_dir=out_dir):
             with open(schema_path, 'r') as s:
                 schema = json.load(s)
 
-            preprocessor = Preprocessor(data, schema, train_dir=out_dir)
+            ##################################################
+            # Edge Case: No seeding values for interpolation #
+            ##################################################
+
+            # [Cause]
+            # This happens when there are feature columns within the original 
+            # dataset that have no values at all (i.e. all NAN values). Being a 
+            # NAN slice, CatBoost will not have any values to infer trends on, 
+            # and will not be able to interpolate those aflicted features. 
+            # CatBoost WILL NOT raise errors, since it deems NANs as valid 
+            # types. As a result, even after inserting spacer columns (obtained 
+            # from performing multiple feature alignment) on one-hot-encoded 
+            # matrices, there will still be NAN values present.
+
+            # [Problems]
+            # Feeding NAN values into models & criterions for loss calculation 
+            # will cause errors, breaking the FL training cycle and halting the 
+            # grid.
+
+            # [Solution]
+            # Remove features corresponding to NAN slices entirely from dataset.
+            # This allows a true representation of the participant's data to be
+            # propagated down the pipeline, which can be caught & penalised
+            # accordingly by the contribution calculator downstream.
+
+            # Augment schema to cater to condensed dataset
+            na_slices = data.columns[data.isna().all()].to_list()
+            logging.debug(f"NA slices: {na_slices}")
+
+            condensed_schema = {
+                feature: d_type for feature, d_type in schema.items()
+                if feature not in na_slices
+            }
+            condensed_data = data.dropna(axis='columns', how='all')
+            assert set(condensed_schema.keys()) == set(condensed_data.columns)
+            logging.debug(f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}")
+
+            preprocessor = Preprocessor(
+                data=condensed_data, 
+                schema=condensed_schema, 
+                train_dir=out_dir
+            )
             interpolated_data = preprocessor.interpolate()
 
             datasets.append(interpolated_data)
@@ -115,6 +156,7 @@ def load_and_combine(tags, out_dir=out_dir):
 
     combined_schema = {}
     for df in tag_unified_datasets:
+        logging.debug(f"Loaded dataset size: {len(df.columns)}")
         curr_schema = df.dtypes.apply(lambda x: x.name).to_dict()
         combined_schema.update(curr_schema)
 
@@ -122,6 +164,7 @@ def load_and_combine(tags, out_dir=out_dir):
         tag_unified_datasets, 
         axis=0
     ).drop_duplicates().reset_index(drop=True)
+    logging.debug(f"Combined data size: {len(combined_data.columns)}")
 
     preprocessor = Preprocessor(
         combined_data, 
@@ -129,6 +172,7 @@ def load_and_combine(tags, out_dir=out_dir):
         train_dir=out_dir
     )
     preprocessor.interpolate()
+    logging.debug(f"Interpolated combined data: {preprocessor.output}")
     X, y, X_header, y_header = preprocessor.transform()
 
     X_combined_tensor = th.Tensor(X)
@@ -194,12 +238,18 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
         augmented_dataset = dataset.clone()
         for idx in alignment_idxs:
 
+            logging.debug(f"Current spacer index: {idx}")
+            logging.debug(f"Before augmentation: size is {augmented_dataset.shape}")
+
             # Slice the dataset along the specified inclusion index
-            first_segment = dataset[:, :idx]
-            second_segment = dataset[:, idx:]
+            first_segment = augmented_dataset[:, :idx]
+            second_segment = augmented_dataset[:, idx:]
+            logging.debug(f"First segment's shape: {first_segment.shape}")
+            logging.debug(f"Second segment's shape: {second_segment.shape}")
 
             # Generate spacer column
-            new_col = th.Tensor(dataset.shape[0], 1)
+            new_col = th.zeros(dataset.shape[0], 1)
+            logging.debug(f"Spacer column's shape: {new_col}, {new_col.shape}")
 
             # Concatenate all segments together, using the spacer as partition
             augmented_dataset = th.cat(
@@ -207,6 +257,7 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
                 dim=1
             )
 
+            logging.debug(f"After augmentation: size is {augmented_dataset.shape}")
         return augmented_dataset
 
     def target(server):
@@ -225,8 +276,10 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     for meta, tags in all_tags.items():
 
         X, y, _, _, _ = load_and_combine(tags=tags, out_dir=out_dir)
+        logging.debug(f"Start process - X shape: {X.shape}")
 
         feature_alignment = all_alignments[meta]['X']
+        logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
         X_aligned = align_dataset(X, feature_alignment)
 
         target_alignment = all_alignments[meta]['y']
@@ -245,6 +298,9 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     kwargs['data'] = final_datasets  #[X, y]
     logging.info(f"Worker metadata: {kwargs}")
 
+    logging.debug(f"Before participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}")
+    logging.debug(f"Before participant initialisation - Registered workers in env : {sy.local_worker._known_workers}")
+
     # Originally, the WSS worker could function properly without mentioning
     # a specific event loop. However, that's because it was ran as the main
     # process, on the default event loop. However, since WSS worker is now 
@@ -254,11 +310,20 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     asyncio.set_event_loop(loop)
 
     # The initialised loop is then fed into WSSW as a custom governing loop
+    # Note: `auto_add=False` is necessary here because we want the WSSW object
+    #       to get automatically garbage collected once it is no longer used.
     kwargs.update({'loop': loop})
     server = participant(hook=hook, **kwargs)
-    server.broadcast_queue = asyncio.Queue(loop=loop)
+    # server.broadcast_queue = asyncio.Queue(loop=loop)
 
     p = Process(target=target, args=(server,))
+
+    # Ensures that when process exits, it attempts to terminate all of its 
+    # daemonic child processes.
+    p.daemon = True
+
+    logging.debug(f"After participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}")
+    logging.debug(f"After participant initialisation - Registered workers in env : {sy.local_worker._known_workers}")
 
     return p, server
 
