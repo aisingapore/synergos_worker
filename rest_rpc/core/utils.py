@@ -11,8 +11,21 @@ from datetime import datetime
 
 # Libs
 import jsonschema
+import pandas as pd
 from flask import jsonify, request
 from flask_restx import fields
+from sklearn.metrics import (
+    accuracy_score, 
+    roc_curve,
+    roc_auc_score, 
+    auc, 
+    precision_recall_curve, 
+    precision_score,
+    recall_score,
+    f1_score, 
+    confusion_matrix
+)
+from sklearn.metrics.cluster import contingency_matrix
 from tinydb import TinyDB, Query, where
 from tinydb.middlewares import CachingMiddleware
 from tinydb.storages import JSONStorage
@@ -36,6 +49,13 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 schemas = app.config['SCHEMAS']
 db_path = app.config['DB_PATH']
 payload_template = app.config['PAYLOAD_TEMPLATE']
+
+####################
+# Helper Functions #
+####################
+
+def construct_combination_key(expt_id, run_id):
+    return str((expt_id, run_id))
 
 ############################################
 # REST Response Formatting Class - Payload #
@@ -183,7 +203,7 @@ class Records:
             path=self.db_path, 
             sort_keys=True,
             indent=4,
-            #separators=(',', ': '),
+            separators=(',', ': '),
             storage=CachingMiddleware(serialization)
         )
 
@@ -338,7 +358,7 @@ class Records:
         return record
 
 ####################################
-# Data Storage Class - PollRecords #
+# Data Storage Class - MetaRecords #
 ####################################
 
 class MetaRecords(Records):
@@ -371,3 +391,135 @@ class MetaRecords(Records):
     def delete(self, project_id):
         meta_key = self.__generate_key(project_id)
         return super().delete('Metadata', 'key', meta_key)
+
+####################################
+# Benchmarking Class - Benchmarker #
+####################################
+
+class Benchmarker:
+    """ Automates the calculation of all supported descriptive statistics
+
+    Attributes:
+        y_true (np.array): Truth labels loaded into WSSW
+        y_pred (np.array): Predictions obtained from TTP, casted into classes
+        y_score (np.array): Raw scores/probabilities obtained from TTP
+    """
+    def __init__(self, y_true, y_pred, y_score):
+        self.y_true = y_true
+        self.y_pred = y_pred
+        self.y_score = y_score
+
+    def calculate_stats(self):
+        """ Calculates descriptive statistics of a training run. Statistics
+            supported include:
+            1) accuracy,
+            2) roc_auc_score
+            3) pr_auc_score
+            4) f_score
+            5) TPR
+            6) TNR
+            7) PPV
+            8) NPV
+            9) FPR
+            10) FNR
+            11) FDR
+            12) TP
+            13) TN
+            14) FP
+            15) FN
+
+        Returns:
+            Statistics (dict)
+        """
+        # Calculate accuracy of predictions
+        accuracy = accuracy_score(self.y_true, self.y_pred)
+        
+        # Calculate ROC-AUC for each label
+        roc = roc_auc_score(self.y_true, self.y_score)
+        fpr, tpr, _ = roc_curve(self.y_true, self.y_score)
+        
+        # Calculate Area under PR curve
+        pc_vals, rc_vals, _ = precision_recall_curve(self.y_true, self.y_score)
+        auc_pr_score = auc(rc_vals, pc_vals)
+        
+        # Calculate F-score
+        f_score = f1_score(self.y_true, self.y_pred)
+
+        # Calculate contingency matrix
+        ct_matrix = contingency_matrix(self.y_true, self.y_pred)
+        
+        # Calculate confusion matrix
+        cf_matrix = confusion_matrix(self.y_true, self.y_pred)
+        logging.debug(f"Confusion matrix: {cf_matrix}")
+
+        TN, FP, FN, TP = cf_matrix.ravel()
+        logging.debug(f"TN: {TN}, FP: {FP}, FN: {FN}, TP: {TP}")
+
+        # Sensitivity, hit rate, recall, or true positive rate
+        TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
+        # Specificity or true negative rate
+        TNR = TN/(TN+FP) if (TN+FP) != 0 else 0
+        # Precision or positive predictive value
+        PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
+        # Negative predictive value
+        NPV = TN/(TN+FN) if (TN+FN) != 0 else 0
+        # Fall out or false positive rate
+        FPR = FP/(FP+TN) if (FP+TN) != 0 else 0
+        # False negative rate
+        FNR = FN/(TP+FN) if (TP+FN) != 0 else 0
+        # False discovery rate
+        FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
+
+        return {
+            'accuracy': float(accuracy),
+            'roc_auc_score': float(roc),
+            'pr_auc_score': float(auc_pr_score),
+            'f_score': float(f_score),
+            'TPR': float(TPR),
+            'TNR': float(TNR),
+            'PPV': float(PPV),
+            'NPV': float(NPV),
+            'FPR': float(FPR),
+            'FNR': float(FNR),
+            'FDR': float(FDR),
+            'TP': int(TP),
+            'TN': int(TN),
+            'FP': int(FP),
+            'FN': int(FN)
+        }
+
+    def decode_ohe_dataset(self, dataset, header, alignment):
+        """ Reverses one-hot encoding applied on a dataset
+        """
+        pass
+
+    def reconstruct_dataset(self):
+        """ Searches WebsocketServerWorker for dataset objects and their
+            corresponding predictions, before stitching them back into a 
+            single dataframe.
+        """
+        pass
+
+    ##################
+    # Core Functions #
+    ##################
+
+    def reconstruct(self):
+        """ Given a mapping of dataset object IDs to their respective prediction
+            object IDs, reconstruct an aggregated dataset with predictions
+            mapped for client's perusal
+        """
+        pass
+
+
+    def analyse(self):
+        """ Automates calculation of descriptive statistics over restored 
+            batched data
+        """
+        pass
+
+
+    def export(self, out_dir):
+        """ Exports reconstructed dataset to file for client's perusal
+        """
+        pass

@@ -150,6 +150,7 @@ def load_and_combine(tags, out_dir=out_dir):
         X_header (list(str))
         y_header (list(str))
         Combined Schema (dict(str))
+        combined_df (pd.DataFrame)
     """
     tag_unified_datasets = [load_dataset(tag=tag, out_dir=out_dir) 
                             for tag in tags]
@@ -183,7 +184,8 @@ def load_and_combine(tags, out_dir=out_dir):
         y_combined_tensor, 
         X_header, 
         y_header, 
-        combined_schema
+        combined_schema,
+        preprocessor.output
     )
 
 
@@ -275,7 +277,7 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     final_datasets = tuple()
     for meta, tags in all_tags.items():
 
-        X, y, _, _, _ = load_and_combine(tags=tags, out_dir=out_dir)
+        X, y, _, _, _, _ = load_and_combine(tags=tags, out_dir=out_dir)
         logging.debug(f"Start process - X shape: {X.shape}")
 
         feature_alignment = all_alignments[meta]['X']

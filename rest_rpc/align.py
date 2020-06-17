@@ -150,9 +150,7 @@ class Alignment(Resource):
                 success_payload = payload_formatter.construct_success_payload(
                     status=200,
                     method="align.post",
-                    params={
-                        'project_id': project_id
-                    },
+                    params=request.view_args,
                     data=updated_metadata
                 )
                 return success_payload, 200

@@ -210,25 +210,36 @@ class Poll(Resource):
                         )
                         os.makedirs(meta_out_dir, exist_ok=True)
 
-                        (X_tensor, y_tensor, X_header, y_header, schema
+                        (X_tensor, y_tensor, X_header, y_header, schema, df
                         ) = load_and_combine(tags=tags, out_dir=meta_out_dir)
 
                         # Export X & y tensors for subsequent use
                         X_export_path = os.path.join(
                             meta_out_dir, 
-                            f"preprocessed_X_{meta}.txt"
+                            f"preprocessed_X_{meta}.npy"
                         )
-                        with open(X_export_path, 'w') as xep:
-                            np.savetxt(xep, X_tensor.numpy())
+                        with open(X_export_path, 'wb') as xep:
+                            np.save(xep, X_tensor.numpy())
 
                         y_export_path = os.path.join(
                             meta_out_dir, 
-                            f"preprocessed_y_{meta}.txt"
+                            f"preprocessed_y_{meta}.npy"
                         )
-                        with open(y_export_path, 'w') as yep:
-                            np.savetxt(y_export_path, y_tensor.numpy())
+                        with open(y_export_path, 'wb') as yep:
+                            np.save(yep, y_tensor.numpy())
 
-                        exports[meta] = {'X': X_export_path, 'y': y_export_path}
+                        # Export combined dataframe for subsequent use
+                        df_export_path = os.path.join(
+                            meta_out_dir, 
+                            f"combined_dataframe_{meta}.csv"
+                        )
+                        df.to_csv(df_export_path, encoding='utf-8')
+
+                        exports[meta] = {
+                            'X': X_export_path, 
+                            'y': y_export_path,
+                            'dataframe': df_export_path
+                        }
                         headers[meta] = {'X': X_header, 'y': y_header}
                         schemas[meta] = schema
 
@@ -241,7 +252,8 @@ class Poll(Resource):
                         'exports': exports,
                         'is_live': False,
                         'in_progress': [],
-                        'connections': []
+                        'connections': [],
+                        'results': {}
                     }
                 )
 
@@ -254,9 +266,7 @@ class Poll(Resource):
         success_payload = payload_formatter.construct_success_payload(
             status=200,
             method="poll.post",
-            params={
-                'project_id': project_id
-            },
+            params=request.view_args,
             data=data
         )
         return success_payload, 200

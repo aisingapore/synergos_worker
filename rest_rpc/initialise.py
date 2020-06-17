@@ -18,7 +18,7 @@ from flask_restx import Namespace, Resource, fields
 # Custom
 from rest_rpc import app
 from rest_rpc.core.server import start_proc
-from rest_rpc.core.utils import Payload, MetaRecords
+from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.poll import tag_model, schema_model
 from rest_rpc.align import alignment_model
 
@@ -73,7 +73,9 @@ init_output_model = ns_api.model(
             ns_api.model(
                 name='key',
                 model={
-                    'project_id': fields.String()
+                    'project_id': fields.String(),
+                    'expt_id': fields.String(),
+                    'run_id': fields.String()
                 }
             ),
             required=True
@@ -184,7 +186,7 @@ class Initialisation(Resource):
 
             retrieved_metadata['is_live'] = cache[project_id]['process'].is_alive()
             
-            expt_run_key = str((expt_id, run_id))
+            expt_run_key = construct_combination_key(expt_id, run_id)
 
             if expt_run_key not in retrieved_metadata['connections']:
                 retrieved_metadata['connections'].append(expt_run_key)
@@ -200,14 +202,10 @@ class Initialisation(Resource):
             success_payload = payload_formatter.construct_success_payload(
                 status=status,
                 method="initialise.post",
-                params={
-                    'project_id': project_id,
-                    'expt_id': expt_id,
-                    'run_id': run_id
-                },
+                params=request.view_args,
                 data=updated_metadata
             )
-            return success_payload, 200
+            return success_payload, status
     
         else:
             ns_api.abort(

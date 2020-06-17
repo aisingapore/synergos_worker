@@ -20,7 +20,7 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.utils import Payload, MetaRecords
+from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.initialise import cache, init_output_model
 
 ##################
@@ -61,7 +61,7 @@ class Termination(Resource):
         """ Closes WebsocketServerWorker to prevent potential cyber attacks during
             times of inactivity
         """
-        expt_run_key = str((expt_id, run_id))
+        expt_run_key = construct_combination_key(expt_id, run_id)
 
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
@@ -109,11 +109,7 @@ class Termination(Resource):
             success_payload = payload_formatter.construct_success_payload(
                 status=200,
                 method="terminate.post",
-                params={
-                    'project_id': project_id,
-                    'expt_id': expt_id,
-                    'run_id': run_id
-                },
+                params=request.view_args,
                 data=updated_metadata
             )
             return success_payload, 200

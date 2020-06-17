@@ -1,6 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "Headers of data from different meta types (Payload)",
+    "title": "Archival logs for worker operations",
     "description": "OHE column names of datasets specified by participant",
     "type": "object",
     "definitions": {
@@ -169,7 +169,10 @@
                 "type": "object",
                 "properties":{
                     "X": {"type": "string"},
-                    "y": {"type": "string"}
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
                 }
             },
     
@@ -178,7 +181,10 @@
                 "type": "object",
                 "properties":{
                     "X": {"type": "string"},
-                    "y": {"type": "string"}
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
                 }
             },
     
@@ -187,7 +193,10 @@
                 "type": "object",
                 "properties":{
                     "X": {"type": "string"},
-                    "y": {"type": "string"}
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
                 }
             }
         },
@@ -281,16 +290,21 @@
             "description": "Statistical results of an experiment-run",
             "type": "object",
             "properties": {
-                "roc_auc": {"type": "number"},
                 "accuracy": {"type": "number"},
-                "specificity": {"type": "number"},
-                "precision": {"type": "number"},
-                "recall": {"type": "number"},
+                "roc_auc_score": {"type": "number"},
+                "pr_auc_score": {"type": "number"},
                 "f_score": {"type": "number"},
-                "tp": {"type": "integer"},
-                "tn": {"type": "integer"},
-                "fp": {"type": "integer"},
-                "fn": {"type": "integer"}
+                "TPR": {"type": "number"},
+                "TNR": {"type": "number"},
+                "PPV": {"type": "number"},
+                "NPV": {"type": "number"},
+                "FPR": {"type": "number"},
+                "FNR": {"type": "number"},
+                "FDR": {"type": "number"},
+                "TP": {"type": "integer"},
+                "TN": {"type": "integer"},
+                "FP": {"type": "integer"},
+                "FN": {"type": "integer"}
             }
         }
     },
@@ -320,16 +334,32 @@
         },
 
         "results": {
-            "description": "Concurrent experiment-runs found under project",
+            "description": "Results for concurrent experiment-runs found under project",
             "type": "object",
-            "properties": {
-                "res_path": {
-                    "description": "Path to results",
-                    "type": "string"
-                }
-            },
             "patternProperties": {
-                "\\((.*?,.*?)\\)": {"$ref": "#/definitions/statistics"}
+                "\\((.*?,.*?)\\)": {
+                    "train": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to training results",
+                            "type": "string"
+                        }
+                    },
+                    "evaluate": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to evaluation results",
+                            "type": "string"
+                        }
+                    },
+                    "predict": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to prediction results",
+                            "type": "string"
+                        }
+                    }
+                }
             }
         }
     },
