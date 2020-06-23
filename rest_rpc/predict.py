@@ -234,99 +234,98 @@ class Prediction(Resource):
             logging.debug(f"Objects in WSSW: {wss_worker._objects}")
             logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}")
 
-            # try:
-            results = {}
-            for meta, inference in request.json['inferences'].items():
+            try:
+                results = {}
+                for meta, inference in request.json['inferences'].items():
 
-                if inference:
+                    if inference:
 
-                    logging.debug(f"Inference: {inference}")
-                    # Prepare output directory for tensor export
-                    meta_out_dir = os.path.join(
-                        out_dir, 
-                        project_id, 
-                        expt_id,
-                        run_id,
-                        meta
-                    )
-                    os.makedirs(meta_out_dir, exist_ok=True)
+                        logging.debug(f"Inference: {inference}")
+                        # Prepare output directory for tensor export
+                        meta_out_dir = os.path.join(
+                            out_dir, 
+                            project_id, 
+                            expt_id,
+                            run_id,
+                            meta
+                        )
+                        os.makedirs(meta_out_dir, exist_ok=True)
 
-                    # Convert received outputs into a compatible format
-                    y_pred = np.array(inference['y_pred'])
-                    y_score = np.array(inference['y_score'])
+                        # Convert received outputs into a compatible format
+                        y_pred = np.array(inference['y_pred'])
+                        y_score = np.array(inference['y_score'])
 
-                    # Retrieved aligned y_true labels
-                    path_to_labels = retrieved_metadata['exports'][meta]['y']
-                    with open(path_to_labels, 'rb') as yep:
-                        labels = np.load(yep)
-                    loaded_labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+                        # Retrieved aligned y_true labels
+                        path_to_labels = retrieved_metadata['exports'][meta]['y']
+                        with open(path_to_labels, 'rb') as yep:
+                            labels = np.load(yep)
+                        loaded_labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
 
-                    logging.debug(f"y_pred: {y_pred}")
-                    logging.debug(f"Labels: {labels}")
-                    logging.debug(f"Loaded Labels: {loaded_labels}")
+                        logging.debug(f"y_pred: {y_pred}")
+                        logging.debug(f"Labels: {labels}")
+                        logging.debug(f"Loaded Labels: {loaded_labels}")
 
-                    assert (labels == loaded_labels).all()
+                        assert (labels == loaded_labels).all()
 
-                    # Calculate inference statistics
-                    benchmarker = Benchmarker(labels, y_pred, y_score)
-                    statistics = benchmarker.calculate_stats()
+                        # Calculate inference statistics
+                        benchmarker = Benchmarker(labels, y_pred, y_score)
+                        statistics = benchmarker.calculate_stats()
 
-                    # Export predictions & scores for client's reference
-                    y_pred_export_path = os.path.join(
-                        meta_out_dir, 
-                        f"inference_predictions_{meta}.txt"
-                    )
-                    with open(y_pred_export_path, 'w') as ypep:
-                        np.savetxt(ypep, y_pred)
+                        # Export predictions & scores for client's reference
+                        y_pred_export_path = os.path.join(
+                            meta_out_dir, 
+                            f"inference_predictions_{meta}.txt"
+                        )
+                        with open(y_pred_export_path, 'w') as ypep:
+                            np.savetxt(ypep, y_pred)
 
-                    y_score_export_path = os.path.join(
-                        meta_out_dir, 
-                        f"inference_scores_{meta}.txt"
-                    )
-                    with open(y_score_export_path, 'w') as ysep:
-                        np.savetxt(ysep, y_score)
+                        y_score_export_path = os.path.join(
+                            meta_out_dir, 
+                            f"inference_scores_{meta}.txt"
+                        )
+                        with open(y_score_export_path, 'w') as ysep:
+                            np.savetxt(ysep, y_score)
 
-                    # Export benchmark statistics for client's reference
-                    stats_export_path = os.path.join(
-                        meta_out_dir,
-                        f"inference_statistics_{meta}.json"
-                    )
-                    with open(stats_export_path, 'w') as sep:
-                        json.dump(statistics, sep)
+                        # Export benchmark statistics for client's reference
+                        stats_export_path = os.path.join(
+                            meta_out_dir,
+                            f"inference_statistics_{meta}.json"
+                        )
+                        with open(stats_export_path, 'w') as sep:
+                            json.dump(statistics, sep)
 
-                    results[meta] = {
-                        'statistics': statistics,
-                        'res_path': stats_export_path
-                    }
+                        results[meta] = {
+                            'statistics': statistics,
+                            'res_path': stats_export_path
+                        }
 
-                    # Update relevant `exports` entries
-                    retrieved_metadata['exports'][meta]['predictions'] = y_pred_export_path
-                    retrieved_metadata['exports'][meta]['scores'] = y_score_export_path
+                        # Update relevant `exports` entries
+                        retrieved_metadata['exports'][meta]['predictions'] = y_pred_export_path
+                        retrieved_metadata['exports'][meta]['scores'] = y_score_export_path
 
-            # Update relevant `results` entries 
-            # Note: This will overwrite previous predictions
-            retrieved_metadata['results'][expt_run_key] = results 
-            updated_metadata = meta_records.update(
-                project_id=project_id, 
-                updates=retrieved_metadata
-            )
-            
-            logging.debug(f"Updated Metadata: {updated_metadata}")
+                # Update relevant `results` entries 
+                # Note: This will overwrite previous predictions
+                retrieved_metadata['results'][expt_run_key] = results 
+                updated_metadata = meta_records.update(
+                    project_id=project_id, 
+                    updates=retrieved_metadata
+                )
+                
+                logging.debug(f"Updated Metadata: {updated_metadata}")
 
-            success_payload = payload_formatter.construct_success_payload(
-                status=200,
-                method="predict.post",
-                params=request.view_args,
-                data=updated_metadata
-            )
-            return success_payload, 200
+                success_payload = payload_formatter.construct_success_payload(
+                    status=200,
+                    method="predict.post",
+                    params=request.view_args,
+                    data=updated_metadata
+                )
+                return success_payload, 200
 
-            # except KeyError as k:
-            #     logging.debug(f"{k}")
-            #     ns_api.abort(                
-            #         code=417,
-            #         message="Insufficient info specified for metadata tracing!"
-            #     )
+            except KeyError as k:
+                ns_api.abort(                
+                    code=417,
+                    message="Insufficient info specified for metadata tracing!"
+                )
 
         else:
             ns_api.abort(

@@ -470,7 +470,7 @@ class Benchmarker:
         # False discovery rate
         FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
 
-        return {
+        statistics = {
             'accuracy': float(accuracy),
             'roc_auc_score': float(roc),
             'pr_auc_score': float(auc_pr_score),
@@ -487,6 +487,11 @@ class Benchmarker:
             'FP': int(FP),
             'FN': int(FN)
         }
+
+        plots = {'roc_curve': [fpr, tpr], 'pr_curve': [pc_vals, rc_vals]}
+        
+        return statistics
+
 
     def decode_ohe_dataset(self, dataset, header, alignment):
         """ Reverses one-hot encoding applied on a dataset
