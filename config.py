@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+Remember to assign all configurable variables in CAPS (eg. OUT_DIR).
+This is because Flask-restx will only load all uppercase variables from
+`config.py`.
+"""
+
 ####################
 # Required Modules #
 ####################
@@ -8,10 +14,16 @@
 import json
 import logging
 import os
+import psutil
 import random
+import subprocess
+import sys
+import zipfile
 from collections import defaultdict, OrderedDict
 from glob import glob
+from string import Template
 from pathlib import Path
+from typing import Dict
 
 # Libs
 import numpy as np
@@ -33,7 +45,7 @@ API_VERSION = "0.0.1"
 # Helper Functions #
 ####################
 
-def seed_everything(seed=42):
+def seed_everything(seed: int = 42) -> bool:
     """ Convenience function to set a constant random seed for model consistency
 
     Args:
@@ -53,7 +65,8 @@ def seed_everything(seed=42):
     except:
         return False
 
-def detect_configurations(dirname):
+
+def detect_configurations(dirname: str) -> Dict[str, str]:
     """ Automates loading of configuration files in specified directory
 
     Args:
@@ -62,7 +75,7 @@ def detect_configurations(dirname):
         Params (dict)
     """
 
-    def parse_filename(filepath):
+    def parse_filename(filepath: str) -> str:
         """ Extracts filename from a specified filepath
             Assumptions: There are no '.' in filename
         
@@ -78,6 +91,24 @@ def detect_configurations(dirname):
     config_paths = glob(config_globstring)
 
     return {parse_filename(c_path): c_path for c_path in config_paths}
+
+
+def install(package: str) -> bool:
+    """ Allows for dynamic runtime installation of python modules. 
+    
+        IMPORTANT: 
+        Modules specified will be installed from source, meaning that `package` 
+        must be a path to some `.tar.gz` archive.
+
+    Args:
+        package (str): Path to distribution package for installation
+    """
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        return True
+
+    except:
+        return False
 
 ################################################
 # PySyft Worker Container Local Configurations #
@@ -103,6 +134,9 @@ TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
 CACHE = infinite_nested_dict()
+
+# Allocate no. of cores for processes
+CORES_USED = psutil.cpu_count(logical=True) - 1
 
 logging.debug(f"Is master node? {IS_MASTER}")
 logging.debug(f"Input directory detected: {IN_DIR}")
@@ -139,6 +173,42 @@ for name, s_path in template_paths.items():
 logging.debug(f"Schemas loaded: {list(SCHEMAS.keys())}")
 
 #######################################
+# PySyft Worker Export Configurations #
+####################################### 
+"""
+Certain Flask requests sent from the TTP (namely `/poll` and `/predict`) will
+trigger file exports to the local machine. This will ensure that all exported
+filenames are consistent.
+"""
+poll_outdir = os.path.join(OUT_DIR, "$project_id", "preprocessing", "$meta")
+aggregated_X_outpath = os.path.join(poll_outdir, "preprocessed_X_$meta.npy")
+aggregated_y_outpath = os.path.join(poll_outdir, "preprocessed_y_$meta.npy")
+aggregated_df_outpath = os.path.join(poll_outdir, "combined_dataframe_$meta.csv")
+POLL_TEMPLATE = {
+    'out_dir': Template(poll_outdir),
+    'X': Template(aggregated_X_outpath),
+    'y': Template(aggregated_y_outpath),
+    'dataframe': Template(aggregated_df_outpath)
+}
+
+predict_outdir = os.path.join(
+    OUT_DIR, 
+    "$project_id", 
+    "$expt_id", 
+    "$run_id", 
+    "$meta"
+)
+y_pred_outpath = os.path.join(predict_outdir, "inference_predictions_$meta.txt")
+y_score_outpath = os.path.join(predict_outdir, "inference_scores_$meta.txt")
+stats_outpath = os.path.join(predict_outdir, "inference_statistics_$meta.json")
+PREDICT_TEMPLATE = {
+    'out_dir': Template(predict_outdir),
+    'y_pred': Template(y_pred_outpath),
+    'y_score': Template(y_score_outpath),
+    'statistics': Template(stats_outpath)
+}
+
+#######################################
 # PySyft Flask Payload Configurations #
 ####################################### 
 """
@@ -154,3 +224,27 @@ PAYLOAD_TEMPLATE = {
     'params': {},
     'data': {}
 }
+
+############################
+# REST-RPC Language Models #
+############################
+
+# Install language models for Spacy
+spacy_src_dir = Path(os.path.join(IN_DIR, 'spacy'))
+spacy_sources = list(spacy_src_dir.glob('**/*.tar.gz'))
+for sp_src in spacy_sources:
+    install(sp_src)
+
+# Load all user-declared source paths for Symspell
+symspell_src_dir = Path(os.path.join(IN_DIR, 'symspell'))
+SYMSPELL_DICTIONARIES = list(symspell_src_dir.glob('**/*dictionary*.txt'))
+SYMSPELL_BIGRAMS = list(symspell_src_dir.glob('**/*bigram*.txt'))
+
+# Load all user-declared data paths for NLTK
+nltk_src_dir = os.path.join(IN_DIR, 'nltk_data')
+os.environ["NLTK_DATA"] = nltk_src_dir
+nltk_sources = list(Path(nltk_src_dir).glob('**/*.zip'))
+for nltk_src in nltk_sources:
+    print(nltk_src)
+    with zipfile.ZipFile(nltk_src,"r") as zip_ref:
+        zip_ref.extractall(path=nltk_src.parent)

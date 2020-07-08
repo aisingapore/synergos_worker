@@ -13,6 +13,7 @@ import os
 from glob import glob
 from multiprocessing import Event, Process
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 # Libs
 import pandas as pd
@@ -44,23 +45,34 @@ out_dir = app.config['OUT_DIR']
 # Functions #
 #############
 
-def detect_metadata(tag):
+def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
     """ Retrieves participant defined metadata describing their declared 
         datasets, as well as possible special operations they would like to
         include or skip during preprocessing. All options and descriptors are
         specified in a file called `metadata.json`, which MUST reside in the
         same folder as the dataset itself.
 
+        IMPORTANT: 
+        1 tag leads to 1 `metadata.json` containing instructions for
+        formatting 1 or more datasets. These datasets MUST have the same:
+
+        1) Features     (for tabular)
+        2) Datatypes    (for tabular)
+        3) Dimensions   (for image)
+
+        These assumptions are necessary for successful combinations.
+
     Args:
         tag (list(str)): Tag of dataset to load into worker
     Returns:
-        All metadata declared along a specific tag
+        Core directory (str)
+        Metadata (dict) 
     """
     # data_dir = "/home/chompsterz/Desktop/datasets"
-    core_dir = Path(data_dir)
-    all_metadata_paths = list(core_dir.glob("**/metadata.json"))
 
-    all_metadata = {}
+    # Searches the data directory for all metadata specifications
+    all_metadata_paths = list(Path(data_dir).glob("**/metadata.json"))
+
     for meta_path in all_metadata_paths:
 
         if set(tag).issubset(set(meta_path.parts)):
@@ -68,9 +80,13 @@ def detect_metadata(tag):
             with open(meta_path, 'r') as s:
                 metadata = json.load(s)
 
-            all_metadata[meta_path.parent] = metadata
+            core_dir = meta_path.parent
 
-    return all_metadata
+            # By definition, 1 tag --> 1 set of metadata. Hence, stop searching
+            # once target metadata set is found
+            return core_dir, metadata
+
+    raise RuntimeError(f"Unable to detect core directory under tag '{tag}'!")
 
 
 def load_tabulars(tab_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
@@ -108,84 +124,17 @@ def load_tabulars(tab_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
     core_dir = Path(tab_dir)
     all_tab_paths = list(core_dir.glob("**/*.csv"))
 
-    datasets = []
-    relevant_data_paths = []
-    for _path in all_tab_paths:
+    if all_tab_paths:
+        tab_pipeline = TabularPipe(data=all_tab_paths, des_dir=out_dir)
+        tab_pipeline.run()
 
-        data = pd.read_csv(_path)
-
-        # Retrieve corresponding schema path. Schemas as supposed to be
-        # stored in the same directory as the dataset(s). At each root
-        # classification, there can be more than 1 dataset, but all datasets
-        # must have the same schema.
-        schema_path = os.path.join(_path.parent, "schema.json")
-        with open(schema_path, 'r') as s:
-            schema = json.load(s)
-
-        ##################################################
-        # Edge Case: No seeding values for interpolation #
-        ##################################################
-
-        # [Cause]
-        # This happens when there are feature columns within the original 
-        # dataset that have no values at all (i.e. all NAN values). Being a 
-        # NAN slice, CatBoost will not have any values to infer trends on, 
-        # and will not be able to interpolate those aflicted features. 
-        # CatBoost WILL NOT raise errors, since it deems NANs as valid 
-        # types. As a result, even after inserting spacer columns (obtained 
-        # from performing multiple feature alignment) on one-hot-encoded 
-        # matrices, there will still be NAN values present.
-
-        # [Problems]
-        # Feeding NAN values into models & criterions for loss calculation 
-        # will cause errors, breaking the FL training cycle and halting the 
-        # grid.
-
-        # [Solution]
-        # Remove features corresponding to NAN slices entirely from dataset.
-        # This allows a true representation of the participant's data to be
-        # propagated down the pipeline, which can be caught & penalised
-        # accordingly by the contribution calculator downstream.
-
-        # Augment schema to cater to condensed dataset
-        na_slices = data.columns[data.isna().all()].to_list()
-        logging.debug(f"NA slices: {na_slices}")
-
-        condensed_schema = {
-            feature: d_type for feature, d_type in schema.items()
-            if feature not in na_slices
-        }
-        condensed_data = data.dropna(axis='columns', how='all')
-        assert set(condensed_schema.keys()) == set(condensed_data.columns)
-        logging.debug(f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}")
-
-        preprocessor = Preprocessor(
-            data=condensed_data, 
-            schema=condensed_schema, 
-            train_dir=out_dir
-        )
-        interpolated_data = preprocessor.interpolate()
-
-        datasets.append(interpolated_data)
-        relevant_data_paths.append(_path)
-
-    logging.debug(f"Data paths detected: {relevant_data_paths}")
-
-    if datasets:
-        tag_unified_data = pd.concat(
-            datasets, 
-            axis=0
-        ).drop_duplicates().reset_index(drop=True)
-
-        logging.debug(f"Tag-unified Schema: {tag_unified_data.dtypes.to_dict()}")
-
-        return tag_unified_data
+        return tab_pipeline.output
 
     else:
-        raise RuntimeError("No valid datasets were detected!")
+        raise RuntimeError("No valid tabular datasets were detected!")
 
 
-def load_images(img_dir: str, metadata: dict) -> pd.DataFrame:
+def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
     """ Loads in all image datasets found in the specified tagged directory.
         Image datasets are expected to be organised according to their classes.
         For example, if a dataset consists of 3 classes, the folder structure
@@ -213,20 +162,20 @@ def load_images(img_dir: str, metadata: dict) -> pd.DataFrame:
 
         IMPORTANT: `metadata.json` is expected to reside in the same folder.
     """
-    class_images = {}
-    for element in os.listdir(img_dir):
+    class_images = []
+    for _class in os.listdir(img_dir):
 
-        class_dir = Path(os.path.join(img_dir, element)).resolve()
+        class_dir = Path(os.path.join(img_dir, _class)).resolve()
 
         # Based on the dictated file structure, images are sorted in directories
         # corresponding to their classes. Hence, extract these directories as
         # class names. Ignore `metadata.json`.
         if os.path.isdir(class_dir):
             image_paths = [x for x in class_dir.glob("**/*") if x.is_file()]
-            class_images[element] = image_paths
+            class_images.append((_class, image_paths))
 
     if class_images:
-        img_pipeline = ImagePipe(data=class_images)
+        img_pipeline = ImagePipe(data=class_images, des_dir=out_dir)
         img_pipeline.run()
 
         return img_pipeline.output
@@ -235,7 +184,7 @@ def load_images(img_dir: str, metadata: dict) -> pd.DataFrame:
         raise RuntimeError("No valid image datasets were detected!")
 
 
-def load_texts(txt_dir: str, metadata: dict) -> pd.DataFrame:
+def load_texts(txt_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
     """ Loads in all corpora found in the specified tagged directory.
         Corpora are expected to exist as `.csv` files with only 2 columns, the
         `text` and `target`. Multiple corpora are allowed in the same directory.
@@ -261,7 +210,12 @@ def load_texts(txt_dir: str, metadata: dict) -> pd.DataFrame:
     all_txt_paths = list(core_dir.glob("**/*.csv"))
 
     if all_txt_paths:
-        text_pipeline = TextPipe(data=all_txt_paths)
+        operations = metadata['operations']
+        text_pipeline = TextPipe(
+            data=all_txt_paths, 
+            des_dir=out_dir, 
+            **operations
+        )
         text_pipeline.run()
 
         return text_pipeline.output
@@ -284,36 +238,22 @@ def load_dataset(tag, out_dir=out_dir):
     Returns:
         Tag-unified dataset (pd.DataFrame)
     """
-    all_metadata = detect_metadata(tag)
+    core_dir, metadata = detect_metadata(tag)
 
-    if all_metadata:
+    if metadata:
 
-        # Ensure that all datasets detected under the tags are of the same datatype
-        # This assumption might be revised later
-        assert len(set([m['datatype'] for _,m in all_metadata.items()])) == 1
+        datatype = metadata['datatype']
 
-        datasets = []
-        for core_dir, metadata in all_metadata.items():
+        if datatype == "tabular":
+            loaded_data = load_tabulars(core_dir, metadata, out_dir)
+        elif datatype == "image":
+            loaded_data = load_images(core_dir, metadata, out_dir)
+        elif datatype == "text":
+            loaded_data = load_texts(core_dir, metadata, out_dir)
+        else:
+            raise ValueError(f"Specified Datatype {datatype} is not supported!")
 
-            datatype = metadata['datatype']
-
-            if datatype == "tabular":
-                df = load_tabulars(core_dir, metadata, out_dir)
-            elif datatype == "image":
-                df = load_images(core_dir, metadata)
-            elif datatype == "text":
-                df = load_texts(core_dir, metadata)
-            else:
-                raise ValueError(f"Specified Datatype {datatype} is not supported!")
-
-            datasets.append(df)
-
-        tag_unified_data = pd.concat(
-            datasets, 
-            axis=0
-        ).drop_duplicates().reset_index(drop=True)
-
-        return tag_unified_data
+        return loaded_data
 
     else:
         raise RuntimeError("No valid datasets were detected!")
@@ -329,7 +269,7 @@ def load_and_combine(tags, out_dir=out_dir):
                        declared datatypes
     
     Args:
-        tag  (list(list(str))): Tags of datasets to load into worker
+        tags (list(list(str))): Tags of datasets to load into worker
     Returns:
         X_combined_tensor (th.Tensor)
         y_combined_tensor (th.Tensor)
@@ -338,41 +278,54 @@ def load_and_combine(tags, out_dir=out_dir):
         Combined Schema (dict(str))
         combined_df (pd.DataFrame)
     """
-    tag_unified_datasets = [load_dataset(tag=tag, out_dir=out_dir) 
-                            for tag in tags]
+    unified_pipedata = sum([
+        load_dataset(tag=tag, out_dir=out_dir)
+        for tag in tags
+    ])
 
-    combined_schema = {}
-    for df in tag_unified_datasets:
-        logging.debug(f"Loaded dataset size: {len(df.columns)}")
-        curr_schema = df.dtypes.apply(lambda x: x.name).to_dict()
-        combined_schema.update(curr_schema)
+    logging.debug(f"unified piped data: {unified_pipedata.data}")
+    # For now, assume that a participant will only declare 1 type of data per 
+    # project. This will be revised in future to handle multiple datatype 
+    # declarations.
+    for datatype, cluster in unified_pipedata.data.items():
 
-    combined_data = pd.concat(
-        tag_unified_datasets, 
-        axis=0
-    ).drop_duplicates().reset_index(drop=True)
-    logging.debug(f"Combined data size: {len(combined_data.columns)}")
+        combined_data = unified_pipedata.info[datatype]
+        logging.debug(f"Combined data size: {len(combined_data.columns)}")
+        logging.debug(f"Combined data columns: {combined_data.columns}")
+        logging.debug(f"Combined data: {combined_data}")
 
-    preprocessor = Preprocessor(
-        combined_data, 
-        combined_schema, 
-        train_dir=out_dir
-    )
-    preprocessor.interpolate()
-    logging.debug(f"Interpolated combined data: {preprocessor.output}")
-    X, y, X_header, y_header = preprocessor.transform()
+        combined_schema = {}
+        for df in cluster:
+            logging.debug(f"Loaded dataset size: {len(df.columns)}")
+            curr_schema = df.dtypes.apply(lambda x: x.name).to_dict()
+            combined_schema.update(curr_schema)
 
-    X_combined_tensor = th.Tensor(X)
-    y_combined_tensor = th.Tensor(y)
+        preprocessor = Preprocessor(
+            combined_data, 
+            combined_schema, 
+            train_dir=out_dir
+        )
 
-    return (
-        X_combined_tensor, 
-        y_combined_tensor, 
-        X_header, 
-        y_header, 
-        combined_schema,
-        preprocessor.output
-    )
+        if datatype == "tabular": # to be refactored into Preprocessor
+            preprocessor.interpolate()
+        else:
+            preprocessor.pad()
+
+        logging.debug(f"Interpolated combined data: {preprocessor.output}")
+
+        X, y, X_header, y_header = preprocessor.transform()
+
+        X_combined_tensor = th.Tensor(X)
+        y_combined_tensor = th.Tensor(y)
+
+        return (
+            X_combined_tensor, 
+            y_combined_tensor, 
+            X_header, 
+            y_header, 
+            combined_schema,
+            preprocessor.output
+        )
 
 
 def annotate(X, y, id, meta):

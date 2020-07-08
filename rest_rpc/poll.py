@@ -36,6 +36,12 @@ out_dir = app.config['OUT_DIR']
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
 
+poll_template = app.config['POLL_TEMPLATE']
+outdir_template = poll_template['out_dir']
+X_template = poll_template['X']
+y_template = poll_template['y']
+df_template = poll_template['dataframe']
+
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
@@ -180,10 +186,8 @@ class Poll(Resource):
                 }
             }
         """
-        logging.debug(request.json)
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
-        print(retrieved_metadata)
 
         # If polling operation had already been done before, skip preprocessing
         # (Note: this is only valid if the submitted set of tags are the same)
@@ -193,75 +197,66 @@ class Poll(Resource):
 
         # Otherwise, perform preprocessing and archive results of operation
         else:
-            try:
-                headers = {}
-                schemas = {}
-                exports = {}
-                for meta, tags in request.json['tags'].items():
+            # try:
+            headers = {}
+            schemas = {}
+            exports = {}
+            for meta, tags in request.json['tags'].items():
 
-                    if tags:
+                if tags:
 
-                        # Prepare output directory for tensor export
-                        meta_out_dir = os.path.join(
-                            out_dir, 
-                            project_id, 
-                            "preprocessing",
-                            meta
-                        )
-                        os.makedirs(meta_out_dir, exist_ok=True)
+                    sub_keys = {'project_id': project_id, 'meta': meta}
 
-                        (X_tensor, y_tensor, X_header, y_header, schema, df
-                        ) = load_and_combine(tags=tags, out_dir=meta_out_dir)
+                    # Prepare output directory for tensor export
+                    meta_out_dir = outdir_template.safe_substitute(sub_keys)
+                    os.makedirs(meta_out_dir, exist_ok=True)
 
-                        # Export X & y tensors for subsequent use
-                        X_export_path = os.path.join(
-                            meta_out_dir, 
-                            f"preprocessed_X_{meta}.npy"
-                        )
-                        with open(X_export_path, 'wb') as xep:
-                            np.save(xep, X_tensor.numpy())
+                    (X_tensor, y_tensor, X_header, y_header, schema, df
+                    ) = load_and_combine(tags=tags, out_dir=meta_out_dir)
 
-                        y_export_path = os.path.join(
-                            meta_out_dir, 
-                            f"preprocessed_y_{meta}.npy"
-                        )
-                        with open(y_export_path, 'wb') as yep:
-                            np.save(yep, y_tensor.numpy())
+                    # Export X & y tensors for subsequent use
+                    X_export_path = X_template.safe_substitute(sub_keys)
+                    with open(X_export_path, 'wb') as xep:
+                        np.save(xep, X_tensor.numpy())
 
-                        # Export combined dataframe for subsequent use
-                        df_export_path = os.path.join(
-                            meta_out_dir, 
-                            f"combined_dataframe_{meta}.csv"
-                        )
-                        df.to_csv(df_export_path, encoding='utf-8')
+                    y_export_path = y_template.safe_substitute(sub_keys)
+                    with open(y_export_path, 'wb') as yep:
+                        np.save(yep, y_tensor.numpy())
 
-                        exports[meta] = {
-                            'X': X_export_path, 
-                            'y': y_export_path,
-                            'dataframe': df_export_path
-                        }
-                        headers[meta] = {'X': X_header, 'y': y_header}
-                        schemas[meta] = schema
+                    # Export combined dataframe for subsequent use
+                    df_export_path = df_template.safe_substitute(sub_keys)
+                    df.to_csv(df_export_path, encoding='utf-8')
 
-                data = meta_records.create(
-                    project_id=project_id, 
-                    details={
-                        'tags': request.json['tags'],
-                        'headers': headers,
-                        'schemas': schemas,
-                        'exports': exports,
-                        'is_live': False,
-                        'in_progress': [],
-                        'connections': [],
-                        'results': {}
+                    exports[meta] = {
+                        'X': X_export_path, 
+                        'y': y_export_path,
+                        'dataframe': df_export_path
                     }
-                )
+                    headers[meta] = {'X': X_header, 'y': y_header}
+                    schemas[meta] = schema
 
-            except KeyError:
-                ns_api.abort(                
-                    code=417,
-                    message="Insufficient info specified for metadata tracing!"
-                )
+                    logging.debug(f"Exports: {exports}")
+
+
+            data = meta_records.create(
+                project_id=project_id, 
+                details={
+                    'tags': request.json['tags'],
+                    'headers': headers,
+                    'schemas': schemas,
+                    'exports': exports,
+                    'is_live': False,
+                    'in_progress': [],
+                    'connections': [],
+                    'results': {}
+                }
+            )
+
+            # except KeyError:
+            #     ns_api.abort(                
+            #         code=417,
+            #         message="Insufficient info specified for metadata tracing!"
+            #     )
 
         success_payload = payload_formatter.construct_success_payload(
             status=200,

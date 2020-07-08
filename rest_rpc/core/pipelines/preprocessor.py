@@ -311,7 +311,7 @@ class Preprocessor:
     # Core Functions #
     ##################
     
-    def interpolate(self, drop_duplicates=True, encrypt=False):
+    def interpolate(self, drop_duplicates=True):
         """ Performs feature-wise interpolations for loaded dataset across all
             weak features. Strength of a feature is defined by its significance.
 
@@ -333,7 +333,23 @@ class Preprocessor:
             self.output = self.output.drop_duplicates().reset_index(drop=True)
 
         return self.output
-    
+
+
+    def pad(self, drop_duplicates=True):
+        """ Handles image & text-derived datasets by filling up unaligned
+            segments with non-representation (i.e. 0)
+
+        Returns:
+            Padded Data (pd.DataFrame)
+        """
+        self.output = self.data.copy()
+        self.output.fillna(0, inplace=True)
+
+        if drop_duplicates:
+            self.output = self.output.drop_duplicates().reset_index(drop=True)
+
+        return self.output
+        
     
     def transform(self, scaler=minmax_scale, condense=True):
         """ Converts interpolated data into a model-ready format 

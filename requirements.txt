@@ -21,9 +21,11 @@ ray==0.7.7
 requests==2.22.0
 scikit-learn==0.22.1
 scipy==1.4.1
+spacy==2.3.0
 statsmodels==0.11.0
 syft==0.2.6
 syft-proto==0.4.7
+symspellpy==6.5.2
 tensorflow==1.15.0
 textstat==0.6.2
 tf-encrypted==0.5.9

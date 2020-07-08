@@ -24,6 +24,7 @@ dependencies:
     - scikit-learn=0.22.1
     - scipy=1.4.1
     - seaborn=0.9.0
+    - spacy=2.3.0
     - statsmodels=0.11.0
     - textstat=0.6.2
     - tqdm=4.40.2
@@ -40,6 +41,7 @@ dependencies:
         - ray==0.7.7
         - syft==0.2.6
         - syft-proto==0.4.7
+        - symspellpy==6.5.2
         - tensorflow==1.15.0
         - tf-encrypted==0.5.9
         - torch==1.4.0

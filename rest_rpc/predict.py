@@ -41,6 +41,12 @@ out_dir = app.config['OUT_DIR']
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
 
+predict_template = app.config['PREDICT_TEMPLATE']
+outdir_template = predict_template['out_dir']
+y_pred_template = predict_template['y_pred']
+y_score_template = predict_template['y_score']
+stats_template = predict_template['statistics']
+
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
@@ -241,14 +247,16 @@ class Prediction(Resource):
                     if inference:
 
                         logging.debug(f"Inference: {inference}")
+
+                        sub_keys = {
+                            'project_id': project_id, 
+                            'expt_id': expt_id,
+                            'run_id': run_id,
+                            'meta': meta
+                        }
+
                         # Prepare output directory for tensor export
-                        meta_out_dir = os.path.join(
-                            out_dir, 
-                            project_id, 
-                            expt_id,
-                            run_id,
-                            meta
-                        )
+                        meta_out_dir = outdir_template.safe_substitute(sub_keys)
                         os.makedirs(meta_out_dir, exist_ok=True)
 
                         # Convert received outputs into a compatible format
@@ -272,25 +280,18 @@ class Prediction(Resource):
                         statistics = benchmarker.calculate_stats()
 
                         # Export predictions & scores for client's reference
-                        y_pred_export_path = os.path.join(
-                            meta_out_dir, 
-                            f"inference_predictions_{meta}.txt"
-                        )
+                        y_pred_export_path = y_pred_template.safe_substitute(sub_keys)
                         with open(y_pred_export_path, 'w') as ypep:
+                            # Saved as .txt to eliminate numpy dependency
                             np.savetxt(ypep, y_pred)
 
-                        y_score_export_path = os.path.join(
-                            meta_out_dir, 
-                            f"inference_scores_{meta}.txt"
-                        )
+                        y_score_export_path = y_score_template.safe_substitute(sub_keys)
                         with open(y_score_export_path, 'w') as ysep:
+                            # Saved as .txt to eliminate numpy dependency
                             np.savetxt(ysep, y_score)
 
                         # Export benchmark statistics for client's reference
-                        stats_export_path = os.path.join(
-                            meta_out_dir,
-                            f"inference_statistics_{meta}.json"
-                        )
+                        stats_export_path = stats_template.safe_substitute(sub_keys)
                         with open(stats_export_path, 'w') as sep:
                             json.dump(statistics, sep)
 
@@ -321,7 +322,7 @@ class Prediction(Resource):
                 )
                 return success_payload, 200
 
-            except KeyError as k:
+            except KeyError:
                 ns_api.abort(                
                     code=417,
                     message="Insufficient info specified for metadata tracing!"
