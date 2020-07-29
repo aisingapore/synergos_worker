@@ -9,6 +9,7 @@ import logging
 import os
 import random
 from pathlib import Path
+from typing import Dict, List, Tuple
 
 # Libs
 import numpy as np
@@ -24,17 +25,20 @@ from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom
+from rest_rpc.core.pipelines.base import BasePipe
+from rest_rpc.core.pipelines.dataset import PipeData
 
 ##################
 # Configurations #
 ##################
 
+BUFFER_FEATURE = "B" + "_"*5 + "#" # entirely arbitrarily chosen
 
 ######################################################
 # Data Preprocessing Class - Iterative Interpolation #
 ######################################################
 
-class Preprocessor:
+class Preprocessor(BasePipe):
     """
     The Preprocessor class prepares a specified dataset for model fitting by
     applying a generalised process of interpolation that is non-data-specific,
@@ -57,37 +61,43 @@ class Preprocessor:
         __seed                  (int): Seed to fix the state of CatBoost
 
         data   (pd.DataFrame): Loaded data to be processed
-        schema         (dict): Schema of the loaded dataframe
+        schema (dict): Schema of the loaded dataframe. If not specified, schema
+            will automatically be inferred from the declared dataset
         output (pd.DataFrame): Processed data (with interpolations applied)
     """
 
-    def __init__(self, data, schema, 
-                 seed=42, boost_iter=100, train_dir=None, thread_count=None):
+    def __init__(
+        self,
+        datatype: str, 
+        data: pd.DataFrame,
+        schema: Dict[str, str] = None,
+        seed: int = 42, 
+        boost_iter: int = 100, 
+        des_dir: str = None, 
+        thread_count: int = None
+    ):
+        super().__init__(datatype=datatype, data=data, des_dir=des_dir)
         random.seed(seed)
-        IPARAMS = {'iterations': boost_iter,
-                   'random_seed': seed,
-                   'thread_count': thread_count,
-                   'logging_level': 'Silent',
-                   'train_dir': train_dir}
+        IPARAMS = {
+            'iterations': boost_iter,
+            'random_seed': seed,
+            'thread_count': thread_count,
+            'logging_level': 'Silent',
+            'train_dir': des_dir
+        }
         self.__cat_interpolator = cat.CatBoostClassifier(**IPARAMS)
         self.__num_interpolator = cat.CatBoostRegressor(**IPARAMS)
         self.__seed = seed
-        self.data = data
-        self.schema = schema
-        self.output = None
+        self.schema = (
+            schema
+            if schema
+            else self.data.dtypes.apply(lambda x: x.name).to_dict()
+        )
 
     ############        
     # Checkers #
     ############
     
-    def is_interpolated(self):
-        """ Checks if interpolation has been performed
-
-        Returns:
-            True    if interpolation has been performed
-            False   otherwise
-        """
-        return self.output is not None
 
     ####################    
     # Helper Functions #
@@ -204,14 +214,7 @@ class Preprocessor:
         Returns:
             Null data (w.r.t specified feature) (pd.DataFrame)
         """
-        # Replace all "?" & "-9.0" with NAN values
-        # (This operation is unique to dataset, subjected to changes)
-        data = df.replace(
-            [-9.0, '?'], np.nan
-        ).replace(
-            {'ca': 9, 'slope': 0, 'thal': [1,2,5]}, np.nan
-        )
-        null_data = data[data[feature].isnull()].dropna(axis=1)
+        null_data = df[df[feature].isnull()].dropna(axis=1)
         null_data[feature] = np.nan
         return null_data
     
@@ -223,15 +226,8 @@ class Preprocessor:
         Returns:
             Ranked weak features (order of decreasing significance) (list)
         """
-        # Replace all "?" & "-9.0" with NAN values
-        # (This operation is unique to dataset, subjected to changes)
-        data = self.data.replace(
-            [-9.0, '?'], np.nan
-        ).replace(
-            {'ca': 9, 'slope': 0, 'thal': [1,2,5]}, np.nan
-        )
         # Evaluate significance of each column
-        significances = data.apply(self.calculate_significance)
+        significances =  self.data.apply(self.calculate_significance)
         # Filter out features with low significance
         low_sig_features = significances[significances < 1]
         # Sort according to significance, in descending order
@@ -291,22 +287,171 @@ class Preprocessor:
             null_idxs.remove(selected_null_idx)
             pbar.update(1)
         pbar.close()
-        """
-        # Cast basis into the correct data type
-        feature_dtype = {feature: self.schema[feature]}
-        is_int = 'int' in self.schema[feature]
-        is_cat = 'category' in self.schema[feature]
-        # Ensure that all values are properly represented first
-        if is_int or is_cat:
-            basis = basis.astype({feature:'float64'}).astype({feature:'int64'})
-        else:
-            basis = basis.astype({feature:'float64'})
-        final_basis = basis.astype(feature_dtype).sort_index(axis=0)
-        """
+
         final_basis = basis.sort_index(axis=0)
             
         return final_basis[feature]
     
+
+    def extract_image_metadata(self):
+        """
+        """
+        if self.datatype == "image":
+
+            # Hack: Use final feature column & parse height + width of each photo
+            img_fmt, h_idx, w_idx = self.data.drop(columns='target').columns[-1].split('x')
+
+            # Hack: Padded values are [0, ..., 0], where no. of '0's is len(img_fmt)
+            pix_pad = tuple([0]*len(img_fmt))
+
+            return pix_pad, int(h_idx), int(w_idx)
+
+
+    def pad_images(self, df):
+        """ Add in spacer values corresponding to the dimensions of each image.
+            For example, for an 'RGBA' image has 10 pixel rows and 10 pixel 
+            columns, whereby each pixel has 3 color channels + 1 alpha channel,
+            dimension of the image will be (10, 10, 4). However, to facilitate
+            alignment, .Originally need to cast to [Batch x Channels x Height x Width]
+            # But for alignment's sake, flatten first, then recast after 
+            # alignment is done
+
+            "{img_format}x{h_idx}x{w_idx}"
+
+        np.asarray(pd.DataFrame(np.asarray(img.convert('RGBA')).tolist()).values.tolist())
+        """
+        pix_pad, _, _ = self.extract_image_metadata()
+
+        # df.fillna() does not work for non-scalars, hence, apply pads manually.
+        for col in df.columns:
+            if col != 'target':
+                df[col] = df[col].apply(
+                    lambda d: d if isinstance(d, tuple) else pix_pad
+                )
+
+        return df
+
+
+    @staticmethod
+    def pad_texts(df):
+        """ Add in spacer values corresponding to each missing coordinate in the
+            word vector.
+        """
+        return df.fillna(0)
+    
+
+    def align_dataset(self, dataset, alignment_idxs):
+        """ Takes in a dataset & inserts null columns in accordance to MFA
+            defined spacer indexes. Alignment indexes are sorted in ascending
+            order.
+
+        Args:
+            dataset (th.Tensor): Data tensor to be augmented
+            alignment_idxs (list(int)): Spacer indexes where header should
+                insert null columns in order to properly align dataset to model
+        Returns:
+            Augmented dataset (th.Tensor)
+        """
+        aligned_dataset = dataset.clone()
+        for idx in alignment_idxs:
+
+            logging.debug(f"Current spacer index: {idx}")
+            logging.debug(f"Before augmentation: size is {aligned_dataset.shape}")
+
+            if self.datatype == "image":
+                pix_pad, _, _ = self.extract_image_metadata()
+                spacer_column = [pix_pad]*dataset.shape(0)
+            else:
+                spacer_column = [[0]]*dataset.shape(0)
+
+            np.insert(aligned_dataset, [idx], spacer_column, axis=1)
+            logging.debug(f"After augmentation: size is {aligned_dataset.shape}")
+        
+        return aligned_dataset
+
+
+    @staticmethod
+    def align_header(header, alignment_idxs):
+        """ Takes in headers (i.e. list of features where order of arrangement
+            matters) & inserts buffer features in accordance to MFA defined 
+            spacer indexes. Alignment indexes are sorted in ascending
+            order.
+
+        Args:
+            header (list(str)): Column/feature names to be aligned
+            alignment_idxs (list(int)): Spacer indexes where header should
+                insert null columns in order to properly align dataset to model
+        Returns:
+            Augmented dataset (th.Tensor)
+        """
+        augmented_headers = header.copy()
+        for idx in alignment_idxs:
+            augmented_headers.insert(idx, BUFFER_FEATURE + str(idx))
+
+        return augmented_headers            
+        
+
+    def transform_defaults(
+        self,
+        scaler=minmax_scale,
+        is_condensed=True,
+        X_alignments=None,
+        y_alignments=None
+    ):
+        """
+        """
+        X, y, X_header, y_header = super().transform(
+            scaler=scaler,   
+            is_condensed=is_condensed
+        )
+        if X_alignments:
+            X = self.align_dataset(X, X_alignments)
+            X_header = self.align_header(X_header, X_alignments)
+
+        if y_alignments:
+            y = self.align_dataset(y, y_alignments)
+            y_header = self.align_header(y_header, y_alignments)
+
+        return X, y, X_header, y_header
+
+
+    def transform_images(
+        self, 
+        is_condensed=True,
+        X_alignments=None,
+        y_alignments=None
+    ):
+        """
+        """
+        X, y, X_header, y_header = super().transform(
+            scaler=None,    # deactivate default transformation
+            is_sorted=False,# No sorting since it destroys convolution
+            is_ohe=False,   # No OHE for image pixels
+            is_condensed=is_condensed
+        )
+        formatted_X = np.array(X.tolist())
+
+        _, h_idx, w_idx = self.extract_image_metadata()
+        height = h_idx + 1
+        width = w_idx + 1
+        data_count = formatted_X.shape[0]
+
+        if X_alignments:
+            formatted_X = self.align_dataset(
+                formatted_X, 
+                X_alignments
+            )
+            X_header = self.align_header(X_header, X_alignments)
+
+        formatted_X = formatted_X.reshape((data_count, -1, height, width))
+        logging.debug(f"Formatted_X: {formatted_X}")
+
+        if y_alignments:
+            y = self.align_dataset(y, y_alignments)
+            y_header = self.align_header(y_header, y_alignments)
+
+        return formatted_X, y, X_header, y_header
+
     ##################    
     # Core Functions #
     ##################
@@ -315,134 +460,124 @@ class Preprocessor:
         """ Performs feature-wise interpolations for loaded dataset across all
             weak features. Strength of a feature is defined by its significance.
 
+            IMPORTANT!
+            Due to the nature of the datasets, only tabular data will be allowed
+            to be interpolated!
+
         Returns:
             Interpolated Data (pd.DataFrame)
         """
-        self.output = self.convert_to_safe_repr(self.data)
-        
-        uncertain_features = self.isolate_uncertain_features()
-        
-        for u_feat in uncertain_features:
-            interpolated_values = self.interpolate_feature(self.output, u_feat)
-            self.output[u_feat] = interpolated_values
+        if self.datatype == "tabular":
+            self.output = self.convert_to_safe_repr(self.data)
             
-        self.output = self.revert_repr(self.output, self.schema)
-        self.output = self.output.astype(self.schema)
-        
-        if drop_duplicates:
-            self.output = self.output.drop_duplicates().reset_index(drop=True)
+            uncertain_features = self.isolate_uncertain_features()
+            
+            for u_feat in uncertain_features:
+                interpolated_values = self.interpolate_feature(self.output, u_feat)
+                self.output[u_feat] = interpolated_values
+                
+            self.output = self.revert_repr(self.output, self.schema)
+            self.output = self.output.astype(self.schema)
+            
+            if drop_duplicates:
+                self.output = self.output.drop_duplicates().reset_index(drop=True)
 
-        return self.output
+            return self.output
+
+        else:
+            raise RuntimeError(f"Interpolation not supported for datatype '{self.datatype}'!")
 
 
     def pad(self, drop_duplicates=True):
         """ Handles image & text-derived datasets by filling up unaligned
-            segments with non-representation (i.e. 0)
+            segments with non-representation (eg. 0)
+
+            IMPORTANT!
+            Due to the nature of the datasets, only image & text datasets are
+            allowed to be padded!
 
         Returns:
             Padded Data (pd.DataFrame)
         """
-        self.output = self.data.copy()
-        self.output.fillna(0, inplace=True)
+        if self.datatype == "image":
+            logging.debug(f"Preprocessor's input data: {self.data}")
+            self.output = self.pad_images(self.data)
+        
+        elif self.datatype == "text":
+            self.output = self.pad_texts(self.data)
+
+        else:
+            raise RuntimeError(f"Padding not supported for datatype '{self.datatype}'!")
 
         if drop_duplicates:
             self.output = self.output.drop_duplicates().reset_index(drop=True)
 
         return self.output
         
-    
-    def transform(self, scaler=minmax_scale, condense=True):
-        """ Converts interpolated data into a model-ready format 
-            (i.e. One-hot encoding categorical variables) and splits final data
-            into training and test data
-            Note: For OHE features, despite being statistical convention to drop
-                  the first OHE feature (i.e. feature class) of each categorical
-                  variable (since it can be represened as a null matrix), in
-                  this case, all OHE features will be maintained. This is
-                  because in federated learning, as 1 worker's dataset possibly
-                  contains only a small subset of the full feature space across
-                  all workers, it is likely that:
-                  1) Not all features are represented locally 
-                     eg. [(X_0_0, X_1_1), (X_1_0, X_1_1), (X_2_0, X_2_1)] vs
-                         [(X_0_0, X_1_1), (X_2_0, X_2_1)]
-                  2) Not all feature classes are represented locally
-                     eg. [(X_0_0, X_1_1), (X_1_0, X_1_1), (X_2_0, X_2_1)]
-                         [(X_0_0       ), (X_1_0, X_1_1), (       X_2_1)]
-                  Hence, there is a need to maintain full local feature coverage
-                  multiple feature alignment will be conducted. However, MFA
-                  will misalign if it does have all possible OHE features to
-                  work with.
-        Args:
-            scaler     (func): Scaling function to be applied unto numerics
-            condense   (bool): Whether to shrink targets to 2 classes (not 5)
-        Return:
-            X           (np.ndarray)
-            y           (np.ndarray)
-            X_header    (list(str))
-            y_header    (list(str))
-        """
-        if not self.is_interpolated():
-            raise RuntimeError("Data must first be interpolated!")
-        
-        features = self.output.drop(columns=['target'])
-        ohe_features = pd.get_dummies(features)#, drop_first=True)
-        ohe_feat_vals = scaler(ohe_features.values)
-        
-        targets = self.output[['target']].copy()
-        ohe_targets = pd.get_dummies(targets)
-        if condense:
-            targets.loc[:,'target'] = targets.target.apply(lambda x: int(x > 0))
-            ohe_targets = pd.get_dummies(targets, drop_first=True)
-        ohe_target_vals = ohe_targets.values
 
-        ohe_feat_header = ohe_features.columns.to_list()
-        ohe_target_header = ohe_targets.columns.to_list()
+    def run(self):
+        """ Wrapper function that automates finetune preprocessing operations on
+            the current dataset.
+
+        Returns
+            Output (pd.DataFrame) 
+        """
+        if self.datatype == "tabular":
+            self.interpolate()
+
+        elif self.datatype in ["image", "text"]:
+            self.pad()
+
+        else:
+            raise RuntimeError(f"Datatype '{self.datatype}' not supported!")
         
-        return (
-            ohe_feat_vals, 
-            ohe_target_vals, 
-            ohe_feat_header, 
-            ohe_target_header
-        )
-    
-    
-    def export(self, des_dir='.'):
-        """ Exports the interpolated dataset.
-            Note: Exported dataset is not one-hot encoded for extensibility
-        
+        return self.output
+
+
+    def transform(
+        self, 
+        scaler=minmax_scale, 
+        is_condensed=True,
+        X_alignments=None,
+        y_alignments=None
+    ):
+        """ In addition to the standard transformation that pipelines can
+            execute, this implements the auto-alignment procedure by augmenting 
+            the X & y datasets using specified alignment indexes received from
+            the TTP.
+
         Args:
-            des_dir (str): Destination directory to save data in
+            scaler   (func): Scaling function to be applied unto numerics
+            condense (bool): Whether to shrink targets to 2 classes
         Returns:
-            Final filepath (str)
+            Aligned X_tensor (np.ndarray)
+            Aligned X_tensor (np.ndarray)
+            X_header         (list(str))
+            y_header         (list(str))
         """
-        filename = "clean_engineered_data.csv"
-        des_path = os.path.join(Path(des_dir).resolve(), filename)
+        if self.datatype in ["tabular", "text"]:
+            X, y, X_header, y_header = self.transform_defaults(
+                scaler=scaler,
+                is_condensed=is_condensed,
+                X_alignments=X_alignments,
+                y_alignments=y_alignments
+            )
 
-        try:
-            os.makedirs(des_path)
-        except FileExistsError:
-            # directory already exists
-            pass
+        elif self.datatype == "image":
+            X, y, X_header, y_header = self.transform_images(
+                is_condensed=is_condensed,
+                X_alignments=X_alignments,
+                y_alignments=y_alignments
+            )
 
-        clean_engineered_data = self.output
-        clean_engineered_data.to_csv(path_or_buf=des_path,
-                                     sep=',', 
-                                     index=False,
-                                     encoding='utf-8',
-                                     header=True)
-        return des_path
-        
-    
-    def reset(self):
-        """ Resets interpolations preprocessing
+        else:
+            raise ValueError(f"Specified Datatype {self.datatype} is not supported!")
 
-        Return:
-            True    if operation is successful
-            False   otherwise
-        """
-        self.output = None
-        return self.output is None
-        
+        X_tensor = th.Tensor(X)
+        y_tensor = th.Tensor(y)
+
+        return X_tensor, y_tensor, X_header, y_header
+
 #########        
 # Tests #
 #########

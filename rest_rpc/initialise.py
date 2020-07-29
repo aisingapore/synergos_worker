@@ -38,6 +38,9 @@ cache = app.config['CACHE']
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
 
+cache_template = app.config['CACHE_TEMPLATE']
+outdir_template = cache_template['out_dir']
+
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
@@ -168,7 +171,14 @@ class Initialisation(Resource):
             # Check that specified experiment run is not already running
             if not cache[project_id]:
 
-                wssw_process, wss_worker = start_proc(**request.json)
+                project_cache_dir = os.path.join(
+                    outdir_template.safe_substitute(project_id=project_id), 
+                    "cache"
+                )
+                wssw_process, wss_worker = start_proc(
+                    **request.json,
+                    out_dir=project_cache_dir
+                )
                 wssw_process.start()
                 assert wssw_process.is_alive()
 

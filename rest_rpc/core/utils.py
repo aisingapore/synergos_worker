@@ -8,9 +8,11 @@
 import logging
 import uuid
 from datetime import datetime
+from typing import Dict, List, Tuple, Union
 
 # Libs
 import jsonschema
+import numpy as np
 import pandas as pd
 from flask import jsonify, request
 from flask_restx import fields
@@ -400,33 +402,140 @@ class Benchmarker:
     """ Automates the calculation of all supported descriptive statistics
 
     Attributes:
-        y_true (np.array): Truth labels loaded into WSSW
-        y_pred (np.array): Predictions obtained from TTP, casted into classes
-        y_score (np.array): Raw scores/probabilities obtained from TTP
+        y_true (np.ndarray): Truth labels loaded into WSSW
+        y_pred (np.ndarray): Predictions obtained from TTP, casted into classes
+        y_score (np.ndarray): Raw scores/probabilities obtained from TTP
     """
-    def __init__(self, y_true, y_pred, y_score):
+    def __init__(
+        self, 
+        y_true: np.ndarray, 
+        y_pred: np.ndarray, 
+        y_score: np.ndarray
+    ):
         self.y_true = y_true
         self.y_pred = y_pred
         self.y_score = y_score
 
-    def calculate_stats(self):
+    ###########
+    # Helpers #
+    ###########
+
+    @staticmethod
+    def find_multiclass_descriptors(
+        y_true: np.ndarray, 
+        y_pred: np.ndarray
+    ) -> Dict[str, List[Union[int, float]]]:
+        """ Finds the values of descriptors for all classes in a multiclass
+            setup. Descriptors are True Negatives (TNs), False Positives (FPs),
+            False Negatives (FNs) and True Positives (TPs).
+
+        Args:
+            y_true (np.ndarray)
+            y_true (np.ndarray)
+        Returns:
+            Descriptors (dict(str, list(int)))
+        """
+        # Calculate confusion matrix
+        cf_matrix = confusion_matrix(y_true, y_pred)
+        logging.debug(f"Confusion matrix: {cf_matrix}")
+
+        FPs = cf_matrix.sum(axis=0) - np.diag(cf_matrix)  
+        FNs = cf_matrix.sum(axis=1) - np.diag(cf_matrix)
+        TPs = np.diag(cf_matrix)
+        TNs = cf_matrix[:].sum() - (FPs + FNs + TPs)
+        logging.debug(f"TNs: {TNs}, FPs: {FPs}, FNs: {FNs}, TP: {TPs}")
+        
+        descriptors = {'TNs': TNs, 'FPs': FPs, 'FNs': FNs, 'TPs': TPs}
+        for des_type, descriptor_values in descriptors.items():
+            descriptors[des_type] = [
+                int(value) for value in descriptor_values
+            ]
+        return descriptors
+
+
+    @staticmethod
+    def calculate_descriptive_rates(
+        TNs: List[int], 
+        FPs: List[int], 
+        FNs: List[int], 
+        TPs: List[int]
+    ) -> Dict[str, List[Union[int, float]]]:
+        """ Calculates the descriptive rates for each class in a multiclass 
+            setup. Supported rates are as follows:
+            1. TPRs: True positive rate
+            2. TNRs: True negative rate
+            3. PPVs: Positive predictive value
+            4. NPVs: Negative predictive value
+            5. FPRs: False positive rate
+            6. FNRs: False negative rate
+            7. FDRs: False discovery rate
+
+        Args:
+            TNs (list(float)): No. of true negatives for all classes
+            FPs (list(float)): No. of false positives for all classes
+            FNs (list(float)): No. of false negatives for all classes
+            TPs (list(float)): No. of true positives for all classes
+        Returns:
+            Descriptive Rates (dict(str, list(float)))
+        """
+        rates = {}
+
+        def add_rate(r_type, value):
+            target_rates = rates.get(r_type, [])
+            target_rates.append(value)
+            rates[r_type] = [float(value) for value in target_rates]
+
+        for TN, FP, FN, TP in zip(TNs, FPs, FNs, TPs):
+
+            # Sensitivity, hit rate, recall, or true positive rate
+            TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
+            add_rate('TPRs', TPR)
+
+            # Specificity or true negative rate
+            TNR = TN/(TN+FP) if (TN+FP) != 0 else 0
+            add_rate('TNRs', TNR)
+
+            # Precision or positive predictive value
+            PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
+            add_rate('PPVs', PPV)
+
+            # Negative predictive value
+            NPV = TN/(TN+FN) if (TN+FN) != 0 else 0
+            add_rate('NPVs', NPV)
+
+            # Fall out or false positive rate
+            FPR = FP/(FP+TN) if (FP+TN) != 0 else 0
+            add_rate('FPRs', FPR)
+
+            # False negative rate
+            FNR = FN/(TP+FN) if (TP+FN) != 0 else 0
+            add_rate('FNRs', FNR)
+
+            # False discovery rate
+            FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
+            add_rate('FDRs', FDR)
+
+        return rates
+
+
+    def calculate_stats(self) -> Dict[str, List[Union[int, float]]]:
         """ Calculates descriptive statistics of a training run. Statistics
             supported include:
             1) accuracy,
             2) roc_auc_score
             3) pr_auc_score
             4) f_score
-            5) TPR
-            6) TNR
-            7) PPV
-            8) NPV
-            9) FPR
-            10) FNR
-            11) FDR
-            12) TP
-            13) TN
-            14) FP
-            15) FN
+            5) TPRs
+            6) TNRs
+            7) PPVs
+            8) NPVs
+            9) FPRs
+            10) FNRs
+            11) FDRs
+            12) TPs
+            13) TNs
+            14) FPs
+            15) FNs
 
         Returns:
             Statistics (dict)
@@ -435,9 +544,12 @@ class Benchmarker:
         accuracy = accuracy_score(self.y_true, self.y_pred)
         
         # Calculate ROC-AUC for each label
-        roc = roc_auc_score(self.y_true, self.y_score)
+        try:
+            roc = roc_auc_score(self.y_true, self.y_score)
+        except ValueError:
+            roc = 0.0
         fpr, tpr, _ = roc_curve(self.y_true, self.y_score)
-        
+                
         # Calculate Area under PR curve
         pc_vals, rc_vals, _ = precision_recall_curve(self.y_true, self.y_score)
         auc_pr_score = auc(rc_vals, pc_vals)
@@ -448,45 +560,17 @@ class Benchmarker:
         # Calculate contingency matrix
         ct_matrix = contingency_matrix(self.y_true, self.y_pred)
         
-        # Calculate confusion matrix
-        cf_matrix = confusion_matrix(self.y_true, self.y_pred)
-        logging.debug(f"Confusion matrix: {cf_matrix}")
-
-        TN, FP, FN, TP = cf_matrix.ravel()
-        logging.debug(f"TN: {TN}, FP: {FP}, FN: {FN}, TP: {TP}")
-
-        # Sensitivity, hit rate, recall, or true positive rate
-        TPR = TP/(TP+FN) if (TP+FN) != 0 else 0
-        # Specificity or true negative rate
-        TNR = TN/(TN+FP) if (TN+FP) != 0 else 0
-        # Precision or positive predictive value
-        PPV = TP/(TP+FP) if (TP+FP) != 0 else 0
-        # Negative predictive value
-        NPV = TN/(TN+FN) if (TN+FN) != 0 else 0
-        # Fall out or false positive rate
-        FPR = FP/(FP+TN) if (FP+TN) != 0 else 0
-        # False negative rate
-        FNR = FN/(TP+FN) if (TP+FN) != 0 else 0
-        # False discovery rate
-        FDR = FP/(TP+FP) if (TP+FP) != 0 else 0
+        descriptors = self.find_multiclass_descriptors(self.y_true, self.y_pred)
+        rates = self.calculate_descriptive_rates(**descriptors)
 
         statistics = {
             'accuracy': float(accuracy),
             'roc_auc_score': float(roc),
             'pr_auc_score': float(auc_pr_score),
-            'f_score': float(f_score),
-            'TPR': float(TPR),
-            'TNR': float(TNR),
-            'PPV': float(PPV),
-            'NPV': float(NPV),
-            'FPR': float(FPR),
-            'FNR': float(FNR),
-            'FDR': float(FDR),
-            'TP': int(TP),
-            'TN': int(TN),
-            'FP': int(FP),
-            'FN': int(FN)
+            'f_score': float(f_score)
         }
+        statistics.update(descriptors)
+        statistics.update(rates)
 
         plots = {'roc_curve': [fpr, tpr], 'pr_curve': [pc_vals, rc_vals]}
         

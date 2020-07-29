@@ -36,11 +36,11 @@ out_dir = app.config['OUT_DIR']
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
 
-poll_template = app.config['POLL_TEMPLATE']
-outdir_template = poll_template['out_dir']
-X_template = poll_template['X']
-y_template = poll_template['y']
-df_template = poll_template['dataframe']
+cache_template = app.config['CACHE_TEMPLATE']
+outdir_template = cache_template['out_dir']
+X_template = cache_template['X']
+y_template = cache_template['y']
+df_template = cache_template['dataframe']
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -195,6 +195,8 @@ class Poll(Resource):
             retrieved_metadata['tags'] == request.json['tags']):
             data = retrieved_metadata
 
+            # Retrieve aligned data from cache
+
         # Otherwise, perform preprocessing and archive results of operation
         else:
             # try:
@@ -208,11 +210,15 @@ class Poll(Resource):
                     sub_keys = {'project_id': project_id, 'meta': meta}
 
                     # Prepare output directory for tensor export
-                    meta_out_dir = outdir_template.safe_substitute(sub_keys)
-                    os.makedirs(meta_out_dir, exist_ok=True)
+                    project_meta_dir = outdir_template.safe_substitute(sub_keys)
+                    project_cache_dir = os.path.join(project_meta_dir, "cache")
+                    os.makedirs(project_cache_dir, exist_ok=True)
 
                     (X_tensor, y_tensor, X_header, y_header, schema, df
-                    ) = load_and_combine(tags=tags, out_dir=meta_out_dir)
+                    ) = load_and_combine(tags=tags, out_dir=project_cache_dir)
+
+                    logging.debug(f"Polled X_header: {X_header}")
+                    logging.debug(f"Polled y_header: {y_header}")
 
                     # Export X & y tensors for subsequent use
                     X_export_path = X_template.safe_substitute(sub_keys)

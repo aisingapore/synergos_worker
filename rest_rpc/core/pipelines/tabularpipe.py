@@ -22,7 +22,7 @@ from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom
-from rest_rpc.core.pipelines.basepipe import BasePipe
+from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.preprocessor import Preprocessor
 from rest_rpc.core.pipelines.dataset import PipeData
 
@@ -47,12 +47,24 @@ class TabularPipe(BasePipe):
 
     Attributes:
         des_dir (str): Destination directory to save data in
-        data   (pd.DataFrame): Loaded data to be processed
-        output (pd.DataFrame): Processed data (with interpolations applied)
+        data   (list(str)): Loaded data to be processed
+        output (PipeData): Processed data (with interpolations applied)
     """
     
-    def __init__(self, data: List[str], des_dir: str):
-        super().__init__(data=data, des_dir=des_dir)
+    def __init__(
+        self, 
+        data: List[str], 
+        des_dir: str,
+        seed: int = 42, 
+        boost_iter: int = 100,  
+        thread_count: int = None
+
+    ):
+        super().__init__(datatype="tabular", data=data, des_dir=des_dir)
+        self.seed = seed
+        self.boost_iter = boost_iter
+        self.thread_count = thread_count
+
 
     ###########
     # Helpers #
@@ -114,16 +126,20 @@ class TabularPipe(BasePipe):
         logging.debug(f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}")
 
         preprocessor = Preprocessor(
+            datatype=self.datatype,
             data=condensed_data, 
             schema=condensed_schema, 
-            train_dir=self.des_dir
+            des_dir=self.des_dir,
+            seed=self.seed,
+            boost_iter=self.boost_iter,
+            thread_count=self.thread_count
         )
         interpolated_data = preprocessor.interpolate()
 
         return interpolated_data
 
 
-    def load_tabulars(self):
+    def load_tabulars(self) -> pd.DataFrame:
         """ Loads in all tabular datasets found in the declared path sets
 
         Returns
@@ -153,9 +169,7 @@ class TabularPipe(BasePipe):
         Returns
             Output (pd.DataFrame) 
         """
-        aggregated_df = self.load_tabulars()
-
-        self.output = PipeData()
-        self.output.update_data('tabular', aggregated_df)
+        if not self.is_processed():
+            self.output = self.load_tabulars()
 
         return self.output

@@ -9,8 +9,8 @@
 # Libs
 
 # Custom
-from .abstractpipe import AbstractPipe
-from .basepipe import BasePipe
+from .abstract import AbstractPipe
+from .base import BasePipe
 from .tabularpipe import TabularPipe
 from .imagepipe import ImagePipe
 from .textpipe import TextPipe

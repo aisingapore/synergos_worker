@@ -129,6 +129,12 @@ OUT_DIR = os.path.join(SRC_DIR, "outputs")
 # State data directory
 DATA_DIR = os.path.join(SRC_DIR, "data")
 
+# State model directory
+MODEL_DIR = os.path.join(SRC_DIR, "models")
+
+# State custom directory
+CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
+
 # State test directory
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
@@ -177,15 +183,16 @@ logging.debug(f"Schemas loaded: {list(SCHEMAS.keys())}")
 ####################################### 
 """
 Certain Flask requests sent from the TTP (namely `/poll` and `/predict`) will
-trigger file exports to the local machine. This will ensure that all exported
-filenames are consistent.
+trigger file exports to the local machine, while other requests 
+(i.e. `initialise`) perform lazy loading and require access to these exports.
+This will ensure that all exported filenames are consistent during referencing.
 """
-poll_outdir = os.path.join(OUT_DIR, "$project_id", "preprocessing", "$meta")
-aggregated_X_outpath = os.path.join(poll_outdir, "preprocessed_X_$meta.npy")
-aggregated_y_outpath = os.path.join(poll_outdir, "preprocessed_y_$meta.npy")
-aggregated_df_outpath = os.path.join(poll_outdir, "combined_dataframe_$meta.csv")
-POLL_TEMPLATE = {
-    'out_dir': Template(poll_outdir),
+cache_dir = os.path.join(OUT_DIR, "$project_id", "preprocessing")
+aggregated_X_outpath = os.path.join(cache_dir, "preprocessed_X_$meta.npy")
+aggregated_y_outpath = os.path.join(cache_dir, "preprocessed_y_$meta.npy")
+aggregated_df_outpath = os.path.join(cache_dir, "combined_dataframe_$meta.csv")
+CACHE_TEMPLATE = {
+    'out_dir': Template(cache_dir),
     'X': Template(aggregated_X_outpath),
     'y': Template(aggregated_y_outpath),
     'dataframe': Template(aggregated_df_outpath)
@@ -230,18 +237,18 @@ PAYLOAD_TEMPLATE = {
 ############################
 
 # Install language models for Spacy
-spacy_src_dir = Path(os.path.join(IN_DIR, 'spacy'))
+spacy_src_dir = Path(os.path.join(CUSTOM_DIR, 'spacy'))
 spacy_sources = list(spacy_src_dir.glob('**/*.tar.gz'))
 for sp_src in spacy_sources:
     install(sp_src)
 
 # Load all user-declared source paths for Symspell
-symspell_src_dir = Path(os.path.join(IN_DIR, 'symspell'))
+symspell_src_dir = Path(os.path.join(CUSTOM_DIR, 'symspell'))
 SYMSPELL_DICTIONARIES = list(symspell_src_dir.glob('**/*dictionary*.txt'))
 SYMSPELL_BIGRAMS = list(symspell_src_dir.glob('**/*bigram*.txt'))
 
 # Load all user-declared data paths for NLTK
-nltk_src_dir = os.path.join(IN_DIR, 'nltk_data')
+nltk_src_dir = os.path.join(CUSTOM_DIR, 'nltk_data')
 os.environ["NLTK_DATA"] = nltk_src_dir
 nltk_sources = list(Path(nltk_src_dir).glob('**/*.zip'))
 for nltk_src in nltk_sources:

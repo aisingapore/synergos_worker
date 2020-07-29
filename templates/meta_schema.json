@@ -294,17 +294,17 @@
                 "roc_auc_score": {"type": "number"},
                 "pr_auc_score": {"type": "number"},
                 "f_score": {"type": "number"},
-                "TPR": {"type": "number"},
-                "TNR": {"type": "number"},
-                "PPV": {"type": "number"},
-                "NPV": {"type": "number"},
-                "FPR": {"type": "number"},
-                "FNR": {"type": "number"},
-                "FDR": {"type": "number"},
-                "TP": {"type": "integer"},
-                "TN": {"type": "integer"},
-                "FP": {"type": "integer"},
-                "FN": {"type": "integer"}
+                "TPRs": {"type": "array"},
+                "TNRs": {"type": "array"},
+                "PPVs": {"type": "array"},
+                "NPVs": {"type": "array"},
+                "FPRs": {"type": "array"},
+                "FNRs": {"type": "array"},
+                "FDRs": {"type": "array"},
+                "TPs": {"type": "array"},
+                "TNs": {"type": "array"},
+                "FPs": {"type": "array"},
+                "FNs": {"type": "array"}
             }
         }
     },

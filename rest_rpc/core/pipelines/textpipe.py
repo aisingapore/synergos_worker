@@ -32,7 +32,7 @@ from tqdm import tqdm
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.pipelines.basepipe import BasePipe
+from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
 ##################
@@ -57,7 +57,10 @@ for ssp_bigram_path in symspell_bigrams:
     sym_spell.load_dictionary(ssp_bigram_path, term_index=0, count_index=2)
 
 # Configure Spacy for nlp operations
-spacy_nlp = spacy.load('en_core_web_sm')
+# [For the current set of supported NLP operations, Spacy implementations have
+#  been tested to be computationally worse off than NLTK implementations. Hence,
+#  temporarily disable Spacy loadings to exclude Spacy-related runtime errors]
+# spacy_nlp = spacy.load('en_core_web_sm')
 
 cores_used = app.config['CORES_USED']
 
@@ -132,7 +135,7 @@ class TextPipe(BasePipe):
         spellcheck: bool = True,
         lemmatize: bool = True,
     ):
-        super().__init__(data=data, des_dir=des_dir)
+        super().__init__(datatype="text", data=data, des_dir=des_dir)
 
         self.__spellchecker = sym_spell
 
@@ -295,7 +298,7 @@ class TextPipe(BasePipe):
     #     """ Fragment all declared sentence lists into lower-case words sets
 
     #     Args:
-    #         sentence_lists (list(list(str))): list of sentences to be evaluated
+    #         articles (list(str)): list of sentences to be evaluated
     #     Returns:
     #         Word sets (list(list(str)))
     #     """ 
@@ -558,51 +561,50 @@ class TextPipe(BasePipe):
         Returns
             Output (pd.DataFrame) 
         """
-        unified_corpus = self.load_unified_corpus()
+        if not self.is_processed():
+            unified_corpus = self.load_unified_corpus()
 
-        articles = unified_corpus['text'].tolist()
+            articles = unified_corpus['text'].tolist()
 
-        ######################################
-        # Stage 1: Document-level operations #
-        ######################################
-        if not self.keep_html:
-            articles = self.strip_html_tags(articles)
+            ######################################
+            # Stage 1: Document-level operations #
+            ######################################
+            if not self.keep_html:
+                articles = self.strip_html_tags(articles)
 
-        if not self.keep_contractions:
-            articles = self.expand_contractions(articles)
+            if not self.keep_contractions:
+                articles = self.expand_contractions(articles)
 
-        ##################################
-        # Stage 2: Word-level operations #
-        ##################################
-        sentence_lists = self.fragment_into_sentences(articles)
-        word_sets = self.fragment_into_words(sentence_lists)
+            ##################################
+            # Stage 2: Word-level operations #
+            ##################################
+            sentence_lists = self.fragment_into_sentences(articles)
+            word_sets = self.fragment_into_words(sentence_lists)
 
-        # word_sets = self.fragment_into_words(articles)
+            # word_sets = self.fragment_into_words(articles)
 
-        if not self.keep_punctuations:
-            word_sets = self.remove_punctuations(word_sets)
+            if not self.keep_punctuations:
+                word_sets = self.remove_punctuations(word_sets)
 
-        if not self.keep_numbers:
-            word_sets = self.convert_numbers(word_sets)
-            word_sets = self.remove_numbers(word_sets)
+            if not self.keep_numbers:
+                word_sets = self.convert_numbers(word_sets)
+                word_sets = self.remove_numbers(word_sets)
 
-        if not self.keep_stopwords:
-            word_sets = self.remove_stopwords(word_sets)
+            if not self.keep_stopwords:
+                word_sets = self.remove_stopwords(word_sets)
 
-        if self.spellcheck:
-            word_sets = self.correct_spelling(word_sets)
+            if self.spellcheck:
+                word_sets = self.correct_spelling(word_sets)
 
-        if self.lemmatize:
-            word_sets = self.lemmatize_words(word_sets)
+            if self.lemmatize:
+                word_sets = self.lemmatize_words(word_sets)
 
-        # Re-combine remaining words into a token article
-        tokenised_articles = [" ".join(w_set) for w_set in word_sets]
-        unified_corpus['text'] = tokenised_articles
+            # Re-combine remaining words into a token article
+            tokenised_articles = [" ".join(w_set) for w_set in word_sets]
+            unified_corpus['text'] = tokenised_articles
 
-        word_vector_matrix = self.create_docterm_matrix(unified_corpus)
-       
-        self.output = PipeData()
-        self.output.update_data('text', word_vector_matrix)
+            self.output = self.create_docterm_matrix(unified_corpus)
 
         logging.debug(f"Doc-term matrix: {self.output.data}")
-        return self.output 
+
+        return self.output

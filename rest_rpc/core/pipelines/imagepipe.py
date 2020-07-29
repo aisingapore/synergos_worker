@@ -10,7 +10,7 @@ import logging
 import os
 from pathlib import Path
 from string import Template
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # Libs
 import numpy as np
@@ -19,7 +19,7 @@ from PIL import Image
 from sklearn.preprocessing import minmax_scale, MinMaxScaler, LabelEncoder
 
 # Custom
-from rest_rpc.core.pipelines.basepipe import BasePipe
+from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
 ##################
@@ -58,7 +58,7 @@ class ImagePipe(BasePipe):
         use_alpha: bool = False,
         use_deepaugment: bool = True,
     ):
-        super().__init__(data=data, des_dir=des_dir)
+        super().__init__(datatype="image", data=data, des_dir=des_dir)
         self.use_grayscale = use_grayscale
         self.use_alpha = use_alpha
         self.use_deepaugment = use_deepaugment
@@ -67,20 +67,39 @@ class ImagePipe(BasePipe):
     # Helpers #
     ###########
 
-    def load_image(
-        self, 
-        img_class: str, 
-        img_path: str
-    ) -> Dict[str, int]:
+    def parse_output(self) -> Tuple[List[str], np.ndarray, Dict[str, str]]:
+        """ In order for the pipelines to be symmetrical, images which are 
+            higher dimensional objects are reshaped to (n, height * width, -1)
+            ndarrays, and stored as a dataframe, where each column represents
+            all values in a pixel. This function ensures that this adapted 
+            structure can be properly transformed back into a numpy array when 
+            necessary.
+
+        Returns:
+            headers (list(str))
+            Image array (np.ndarray)
+            schema (dict(str, str))
+        """
+        headers, values, schema = super().parse_output()
+        formatted_values = np.array(values.tolist())
+        return headers, formatted_values, schema
+
+
+    def load_image(self, img_class: str, img_path: str) -> pd.DataFrame:
         """ Loads in a single image and retrieves its pixel values
 
         Args:
             img_class (str): Classification label of image
             img_path (str): Path to image
         Returns:
-            Pixel Map (dict(str, int))
+            Pixel Map (pd.DataFrame)
         """
         with Image.open(img_path) as img: 
+
+            img_format = Template("$color$alpha")
+            color = "L" if self.use_grayscale else "RGB"
+            alpha = "A" if self.use_alpha else ""
+            img_format = img_format.substitute(color=color, alpha=alpha)
 
             # Generate column names according to dimensions of image. This will
             # allow for auto-padding during feature alignment, both locally 
@@ -88,20 +107,20 @@ class ImagePipe(BasePipe):
             # datasets amongst workers)
             width, height = img.size
             pix_col_names = [
-                f"{h_idx}x{w_idx}"
+                f"{img_format}x{h_idx}x{w_idx}"
                 for h_idx in range(height)
                 for w_idx in range(width)
             ]
 
-            img_format = Template("$color$alpha")
-            color = "L" if self.use_grayscale else "RGB"
-            alpha = "A" if self.use_alpha else ""
-            img_format = img_format.substitute(color=color, alpha=alpha)
+            # Originally need to cast to [Batch x Channels x Height x Width]
+            # But for the sake of alignment, flatten first. Allow Preprocessor
+            # to handle the necessary operations for formatting the images for
+            # use in WebsocketServerWorker
+            # np.asarray(pd.concat([df1, df2]).values.tolist()).reshape(2, -1, 28, 28)
             formatted_img = img.convert(img_format)
-
-            # Temporary implementation until full generalisation is achieved
-            pix_vals = np.asarray(formatted_img).reshape((1, width * height))
-            logging.debug(f"Pixel Values: {pix_vals}, {pix_vals.shape}")
+            pix_vals = np.asarray(formatted_img).reshape(
+                (1, height * width, -1)
+            ).tolist()
             
         pix_map = pd.DataFrame(data=pix_vals, columns=pix_col_names)
         pix_map['target'] = img_class
@@ -134,11 +153,11 @@ class ImagePipe(BasePipe):
         return aggregated_df
 
 
-    def apply_deepaugment(self):
+    def apply_deepaugment(self, df):
         """ Apply AutoML methods to search for the appropriate preprocessing
             operations to use for transforming the images
         """
-        pass
+        return df
 
     ##################
     # Core Functions #
@@ -151,10 +170,8 @@ class ImagePipe(BasePipe):
         Returns
             Output (pd.DataFrame) 
         """
-        aggregated_df = self.load_images()
-        self.apply_deepaugment()
-
-        self.output = PipeData()
-        self.output.update_data('image', aggregated_df)
+        if not self.is_processed():
+            aggregated_df = self.load_images()
+            self.output = self.apply_deepaugment(aggregated_df)
 
         return self.output

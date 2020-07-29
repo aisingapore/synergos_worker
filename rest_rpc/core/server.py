@@ -36,6 +36,8 @@ from rest_rpc.core.pipelines import (
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
+device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+
 hook = sy.TorchHook(th, verbose=False) # toggle where necessary
 
 data_dir = app.config['DATA_DIR']
@@ -128,7 +130,7 @@ def load_tabulars(tab_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         tab_pipeline = TabularPipe(data=all_tab_paths, des_dir=out_dir)
         tab_pipeline.run()
 
-        return tab_pipeline.output
+        return tab_pipeline.offload()
 
     else:
         raise RuntimeError("No valid tabular datasets were detected!")
@@ -178,7 +180,7 @@ def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         img_pipeline = ImagePipe(data=class_images, des_dir=out_dir)
         img_pipeline.run()
 
-        return img_pipeline.output
+        return img_pipeline.offload()
 
     else:
         raise RuntimeError("No valid image datasets were detected!")
@@ -218,7 +220,7 @@ def load_texts(txt_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         )
         text_pipeline.run()
 
-        return text_pipeline.output
+        return text_pipeline.offload()
 
     else:
         raise RuntimeError("No valid corpora were detected!")
@@ -243,23 +245,31 @@ def load_dataset(tag, out_dir=out_dir):
     if metadata:
 
         datatype = metadata['datatype']
+        tag_key = "-".join(tag)
+        caching_dir = os.path.join(out_dir, datatype, tag_key)
 
         if datatype == "tabular":
-            loaded_data = load_tabulars(core_dir, metadata, out_dir)
+            loaded_data = load_tabulars(core_dir, metadata, caching_dir)
         elif datatype == "image":
-            loaded_data = load_images(core_dir, metadata, out_dir)
+            loaded_data = load_images(core_dir, metadata, caching_dir)
         elif datatype == "text":
-            loaded_data = load_texts(core_dir, metadata, out_dir)
+            loaded_data = load_texts(core_dir, metadata, caching_dir)
         else:
             raise ValueError(f"Specified Datatype {datatype} is not supported!")
 
+        logging.debug(f"Loaded tag data: {loaded_data}")
         return loaded_data
 
     else:
         raise RuntimeError("No valid datasets were detected!")
 
 
-def load_and_combine(tags, out_dir=out_dir):
+def load_and_combine(
+    tags,         
+    X_alignments: List[str] = None,
+    y_alignments: List[str] = None,
+    out_dir=out_dir
+):
     """ Loads in all datasets found along the corresponding subdirectory
         sequence defined by the specified tags, and combines them into a single
         unified dataset.
@@ -278,54 +288,63 @@ def load_and_combine(tags, out_dir=out_dir):
         Combined Schema (dict(str))
         combined_df (pd.DataFrame)
     """
+    aggregate_des_dir = os.path.join(
+        out_dir, 
+        "aggregates",
+        "-".join([token for tag in tags for token in tag])
+    )
+
     unified_pipedata = sum([
         load_dataset(tag=tag, out_dir=out_dir)
         for tag in tags
     ])
 
     logging.debug(f"unified piped data: {unified_pipedata.data}")
+
     # For now, assume that a participant will only declare 1 type of data per 
     # project. This will be revised in future to handle multiple datatype 
-    # declarations.
-    for datatype, cluster in unified_pipedata.data.items():
+    # declarations (changes have to be made on the TTP to handle multiple
+    # datatype alignments concurrently)
+    combined_data = unified_pipedata.compute()
+    for datatype, data in combined_data.items():
 
-        combined_data = unified_pipedata.info[datatype]
-        logging.debug(f"Combined data size: {len(combined_data.columns)}")
-        logging.debug(f"Combined data columns: {combined_data.columns}")
-        logging.debug(f"Combined data: {combined_data}")
-
-        combined_schema = {}
-        for df in cluster:
-            logging.debug(f"Loaded dataset size: {len(df.columns)}")
-            curr_schema = df.dtypes.apply(lambda x: x.name).to_dict()
-            combined_schema.update(curr_schema)
+        logging.debug(f"Data size: {len(data.columns)}")
+        logging.debug(f"Data columns: {data.columns}")
+        logging.debug(f"Data: {data}")
 
         preprocessor = Preprocessor(
-            combined_data, 
-            combined_schema, 
-            train_dir=out_dir
+            datatype=datatype, 
+            data=data, 
+            des_dir=aggregate_des_dir
         )
-
-        if datatype == "tabular": # to be refactored into Preprocessor
-            preprocessor.interpolate()
-        else:
-            preprocessor.pad()
+        preprocessor.run()
 
         logging.debug(f"Interpolated combined data: {preprocessor.output}")
 
-        X, y, X_header, y_header = preprocessor.transform()
-
-        X_combined_tensor = th.Tensor(X)
-        y_combined_tensor = th.Tensor(y)
+        (
+            X_combined_tensor, 
+            y_combined_tensor, 
+            X_combined_header, 
+            y_combined_header
+        ) = preprocessor.transform(
+            X_alignments=X_alignments,
+            y_alignments=y_alignments
+        )
 
         return (
             X_combined_tensor, 
             y_combined_tensor, 
-            X_header, 
-            y_header, 
-            combined_schema,
+            X_combined_header, 
+            y_combined_header, 
+            preprocessor.schema,
             preprocessor.output
         )
+
+
+def load_model(tag):
+    """
+    """
+    pass
 
 
 def annotate(X, y, id, meta):
@@ -363,44 +382,6 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
         Federated worker
     """
 
-    def align_dataset(dataset, alignment_idxs):
-        """ Takes in a dataset & inserts null columns in accordance to MFA
-            defined spacer indexes. Alignment indexes are sorted in ascending
-            order.
-
-        Args:
-            dataset (th.Tensor): Data tensor to be augmented
-            alignment_idxs (list(int)): Spacer indexes where dataset should
-                                        insert null columns in order to properly
-                                        align dataset to model trained
-        Returns:
-            Augmented dataset (th.Tensor)
-        """
-        augmented_dataset = dataset.clone()
-        for idx in alignment_idxs:
-
-            logging.debug(f"Current spacer index: {idx}")
-            logging.debug(f"Before augmentation: size is {augmented_dataset.shape}")
-
-            # Slice the dataset along the specified inclusion index
-            first_segment = augmented_dataset[:, :idx]
-            second_segment = augmented_dataset[:, idx:]
-            logging.debug(f"First segment's shape: {first_segment.shape}")
-            logging.debug(f"Second segment's shape: {second_segment.shape}")
-
-            # Generate spacer column
-            new_col = th.zeros(dataset.shape[0], 1)
-            logging.debug(f"Spacer column's shape: {new_col}, {new_col.shape}")
-
-            # Concatenate all segments together, using the spacer as partition
-            augmented_dataset = th.cat(
-                (first_segment, new_col, second_segment),
-                dim=1
-            )
-
-            logging.debug(f"After augmentation: size is {augmented_dataset.shape}")
-        return augmented_dataset
-
     def target(server):
         """ Initialises websocket server to listen to specified port for
             incoming connections
@@ -416,15 +397,17 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     final_datasets = tuple()
     for meta, tags in all_tags.items():
 
-        X, y, _, _, _, _ = load_and_combine(tags=tags, out_dir=out_dir)
-        logging.debug(f"Start process - X shape: {X.shape}")
-
         feature_alignment = all_alignments[meta]['X']
-        logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
-        X_aligned = align_dataset(X, feature_alignment)
-
         target_alignment = all_alignments[meta]['y']
-        y_aligned = align_dataset(y, target_alignment)
+        logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
+       
+        X_aligned, y_aligned, _, _, _, _ = load_and_combine(
+            tags=tags,
+            X_alignments=feature_alignment,
+            y_alignments=target_alignment,
+            out_dir=out_dir
+        )
+        logging.debug(f"Start process - X shape: {X_aligned.shape}")
 
         X_aligned_annotated, y_aligned_annotated = annotate(
             X=X_aligned, 
@@ -432,6 +415,10 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
             id=kwargs['id'], 
             meta=f"{meta}"
         )
+
+        X_aligned_annotated = X_aligned_annotated.to(device)
+        y_aligned_annotated = y_aligned_annotated.to(device)
+
         final_datasets += (X_aligned_annotated, y_aligned_annotated)
 
         logging.debug(f"Loaded {meta} data: {X_aligned_annotated, y_aligned_annotated}")
@@ -454,6 +441,8 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     # Note: `auto_add=False` is necessary here because we want the WSSW object
     #       to get automatically garbage collected once it is no longer used.
     kwargs.update({'loop': loop})
+    logging.debug(f"WSSW's kwargs: {kwargs}")
+
     server = participant(hook=hook, **kwargs)
     # server.broadcast_queue = asyncio.Queue(loop=loop)
 
