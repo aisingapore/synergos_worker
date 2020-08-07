@@ -22,6 +22,7 @@ from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom
+from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.preprocessor import Preprocessor
 from rest_rpc.core.pipelines.dataset import PipeData
@@ -30,6 +31,7 @@ from rest_rpc.core.pipelines.dataset import PipeData
 # Configurations #
 ##################
 
+cores_used = app.config['CORES_USED']
 
 ##########################################
 # Data Preprocessing Class - TabularPipe #
@@ -57,14 +59,14 @@ class TabularPipe(BasePipe):
         des_dir: str,
         seed: int = 42, 
         boost_iter: int = 100,  
-        thread_count: int = None
-
+        thread_count: int = -1,
+        allow_writing_files: bool = False
     ):
         super().__init__(datatype="tabular", data=data, des_dir=des_dir)
         self.seed = seed
         self.boost_iter = boost_iter
         self.thread_count = thread_count
-
+        self.allow_writing_files = allow_writing_files
 
     ###########
     # Helpers #
@@ -87,6 +89,8 @@ class TabularPipe(BasePipe):
         schema_path = os.path.join(tab_path.parent, "schema.json")
         with open(schema_path, 'r') as s:
             schema = json.load(s)
+
+            logging.debug(f"No. of keys in schema: {schema} {len(schema)}")
 
         ##################################################
         # Edge Case: No seeding values for interpolation #
@@ -122,8 +126,11 @@ class TabularPipe(BasePipe):
             if feature not in na_slices
         }
         condensed_data = data.dropna(axis='columns', how='all')
-        assert set(condensed_schema.keys()) == set(condensed_data.columns)
+        
+        logging.debug(f"Condensed schema: {condensed_schema}, length: {len(condensed_schema.keys())}")
         logging.debug(f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}")
+        logging.debug(f"Difference: {set(condensed_schema.keys()).symmetric_difference(set(condensed_data.columns))}")
+        assert set(condensed_schema.keys()) == set(condensed_data.columns)
 
         preprocessor = Preprocessor(
             datatype=self.datatype,
@@ -132,9 +139,12 @@ class TabularPipe(BasePipe):
             des_dir=self.des_dir,
             seed=self.seed,
             boost_iter=self.boost_iter,
-            thread_count=self.thread_count
+            thread_count=self.thread_count,
+            allow_writing_files=self.allow_writing_files
         )
         interpolated_data = preprocessor.interpolate()
+
+        logging.debug(f"After local interpolation: {interpolated_data.dtypes.to_dict()}")
 
         return interpolated_data
 
@@ -148,13 +158,36 @@ class TabularPipe(BasePipe):
         with concurrent.futures.ProcessPoolExecutor() as executor:
             datasets = list(executor.map(self.load_tabular, self.data))
 
+        ###########################
+        # Implementation Footnote #
+        ###########################
+
+        # [Cause]
+        # While concatenating categories, pandas will revert categorical
+        # datatypes to integers if the no. of class labels are not the same.
+
+        # [Problems]
+        # This results in stray typing in the dataframe, which will lead to
+        # problems downstream in schema-reliant operations.
+
+        # [Solution]
+        # Explicitly organise the schema and cast the dataframe accordingly.
+
+        # Aggregate all schemas of all datasets
+        aggregated_schema = {
+            feature: datatype 
+            for df in datasets 
+            for feature, datatype in df.dtypes.to_dict().items()
+        }
+
         # Assumption: At least one data path has been specified
         aggregated_df = pd.concat(
             datasets, 
-            axis=0
-        ).drop_duplicates().reset_index(drop=True)
+            axis=0,
+            sort=False
+        ).drop_duplicates().reset_index(drop=True).astype(aggregated_schema)
 
-        logging.debug(f"Tag-unified Schema: {aggregated_df.dtypes.to_dict()}")
+        logging.debug(f"Tag-unified Schema: {aggregated_df.dtypes.to_dict()} {len(aggregated_df.dtypes.to_dict())}")
 
         return aggregated_df
 

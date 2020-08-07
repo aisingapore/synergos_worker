@@ -134,6 +134,7 @@ class ImagePipe(BasePipe):
         Returns
             Output (pd.DataFrame)
         """
+        all_images = []
         for img_class, img_paths in self.data:
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -142,7 +143,9 @@ class ImagePipe(BasePipe):
                     img_paths
                 ))
 
-        aggregated_df = pd.concat(class_images)
+            all_images += class_images
+
+        aggregated_df = pd.concat(all_images)
         
         # Ensure that all classes are numerically represented
         labelencoder = LabelEncoder()

@@ -12,12 +12,15 @@ import os
 from glob import glob
 from multiprocessing import Event, Process
 from pathlib import Path
+from typing import Dict, List, Tuple, Union
 
 # Libs
 import pandas as pd
 import syft as sy
 import torch as th
+from syft.generic.tensor import AbstractTensor
 from syft.workers.websocket_server import WebsocketServerWorker
+
 
 # Custom
 
@@ -29,13 +32,13 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hook = sy.TorchHook(th, is_client=False)
 
-############################################
-# Custom Async Class - FedProxServerWorker #
-############################################
+###########################################
+# Custom Async Class - CustomServerWorker #
+###########################################
 
-class FedProxServerWorker(WebsocketServerWorker):
+class CustomServerWorker(WebsocketServerWorker):
     """ This is a simple extension to WebsocketServerWorkers in allow
-        asynchronous fitting with FedProx evaluation integrated
+        asynchronous fitting with generic algorithm suppport
 
     Args:
         hook (sy.TorchHook): a normal TorchHook object
@@ -61,7 +64,7 @@ class FedProxServerWorker(WebsocketServerWorker):
         id: Union[int, str] = 0,
         log_msgs: bool = False,
         verbose: bool = False,
-        data: List[Union[torch.Tensor, AbstractTensor]] = None,
+        data: List[Union[th.Tensor, AbstractTensor]] = None,
         loop=None,
         cert_path: str = None,
         key_path: str = None,
@@ -80,6 +83,7 @@ class FedProxServerWorker(WebsocketServerWorker):
             cert_path=cert_path,
             key_path=key_path
         )
+        
 
     def fit(self, dataset_key: str, device: str = "cpu", **kwargs):
         """Fits a model on the local dataset as specified in the local TrainConfig object.

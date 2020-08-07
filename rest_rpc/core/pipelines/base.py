@@ -165,16 +165,23 @@ class BasePipe(AbstractPipe):
         features = self.output.drop(columns=['target'])
         targets = self.output[['target']].copy()
 
-        if is_sorted:
-            features = features.reindex(sorted(features.columns), axis=1)
+        logging.debug(f"Datatypes: {features.dtypes.to_dict()}")
 
         if is_ohe:
             features = pd.get_dummies(features)
 
+        if is_sorted:
+            features = features.reindex(sorted(features.columns), axis=1)
+            logging.debug(f"Sorted features: {features.columns}")
+            logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}")
+
         # Target values have to be one-hot encoded regardless of OHE-preference
         ohe_targets = pd.get_dummies(targets)
         if is_condensed:
-            targets.loc[:,'target'] = targets.target.apply(lambda x: int(x > 0))
+            median_target = targets.target.median()
+            targets.loc[:,'target'] = targets.target.apply(
+                lambda x: int(x > median_target)
+            )
             ohe_targets = pd.get_dummies(targets, drop_first=True)
         targets = ohe_targets
 

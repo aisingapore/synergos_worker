@@ -70,8 +70,6 @@ def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
         Core directory (str)
         Metadata (dict) 
     """
-    # data_dir = "/home/chompsterz/Desktop/datasets"
-
     # Searches the data directory for all metadata specifications
     all_metadata_paths = list(Path(data_dir).glob("**/metadata.json"))
 
@@ -319,7 +317,7 @@ def load_and_combine(
         )
         preprocessor.run()
 
-        logging.debug(f"Interpolated combined data: {preprocessor.output}")
+        logging.debug(f"Interpolated combined data: {preprocessor.output} {preprocessor.output.shape}")
 
         (
             X_combined_tensor, 
@@ -331,6 +329,10 @@ def load_and_combine(
             y_alignments=y_alignments
         )
 
+        # preprocessor.offload()
+
+        logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}")
+
         return (
             X_combined_tensor, 
             y_combined_tensor, 
@@ -339,12 +341,6 @@ def load_and_combine(
             preprocessor.schema,
             preprocessor.output
         )
-
-
-def load_model(tag):
-    """
-    """
-    pass
 
 
 def annotate(X, y, id, meta):

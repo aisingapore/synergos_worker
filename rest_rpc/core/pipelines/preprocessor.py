@@ -9,7 +9,9 @@ import logging
 import os
 import random
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Callable
+import multiprocessing
+
 
 # Libs
 import numpy as np
@@ -25,6 +27,7 @@ from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom
+from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
@@ -33,6 +36,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 ##################
 
 BUFFER_FEATURE = "B" + "_"*5 + "#" # entirely arbitrarily chosen
+
+cores_used = app.config['CORES_USED']
 
 ######################################################
 # Data Preprocessing Class - Iterative Interpolation #
@@ -74,7 +79,8 @@ class Preprocessor(BasePipe):
         seed: int = 42, 
         boost_iter: int = 100, 
         des_dir: str = None, 
-        thread_count: int = None
+        thread_count: int = -1,
+        allow_writing_files=False
     ):
         super().__init__(datatype=datatype, data=data, des_dir=des_dir)
         random.seed(seed)
@@ -83,7 +89,8 @@ class Preprocessor(BasePipe):
             'random_seed': seed,
             'thread_count': thread_count,
             'logging_level': 'Silent',
-            'train_dir': des_dir
+            'train_dir': des_dir,
+            'allow_writing_files': allow_writing_files
         }
         self.__cat_interpolator = cat.CatBoostClassifier(**IPARAMS)
         self.__num_interpolator = cat.CatBoostRegressor(**IPARAMS)
@@ -93,6 +100,7 @@ class Preprocessor(BasePipe):
             if schema
             else self.data.dtypes.apply(lambda x: x.name).to_dict()
         )
+        logging.debug(f"Schema in Preprocessor: {self.schema}")
 
     ############        
     # Checkers #
@@ -197,9 +205,10 @@ class Preprocessor(BasePipe):
         Returns:
             Feature-complete segment (pd.DataFrame)
         """
-        feature_vals = df[feature]
+        feature_vals = df[feature].copy()
         data = df.dropna(axis=1)
-        data[feature] = feature_vals
+        data.loc[:, feature] = feature_vals
+
         feature_complete_segment = data[~data[feature].isnull()]
         return feature_complete_segment.dropna(axis=1)
     
@@ -340,7 +349,7 @@ class Preprocessor(BasePipe):
         return df.fillna(0)
     
 
-    def align_dataset(self, dataset, alignment_idxs):
+    def align_dataset(self, dataset: np.ndarray, alignment_idxs: List[int]):
         """ Takes in a dataset & inserts null columns in accordance to MFA
             defined spacer indexes. Alignment indexes are sorted in ascending
             order.
@@ -352,7 +361,9 @@ class Preprocessor(BasePipe):
         Returns:
             Augmented dataset (th.Tensor)
         """
-        aligned_dataset = dataset.clone()
+        logging.debug(f"Alignment indexes: {alignment_idxs}")
+
+        aligned_dataset = dataset.copy()
         for idx in alignment_idxs:
 
             logging.debug(f"Current spacer index: {idx}")
@@ -360,18 +371,24 @@ class Preprocessor(BasePipe):
 
             if self.datatype == "image":
                 pix_pad, _, _ = self.extract_image_metadata()
-                spacer_column = [pix_pad]*dataset.shape(0)
+                spacer_column = [pix_pad] * dataset.shape[0]
             else:
-                spacer_column = [[0]]*dataset.shape(0)
+                spacer_column = [[0]] * dataset.shape[0]
 
-            np.insert(aligned_dataset, [idx], spacer_column, axis=1)
+            aligned_dataset = np.insert(
+                aligned_dataset, 
+                [idx], 
+                spacer_column, 
+                axis=1
+            )
+
             logging.debug(f"After augmentation: size is {aligned_dataset.shape}")
         
         return aligned_dataset
 
 
     @staticmethod
-    def align_header(header, alignment_idxs):
+    def align_header(header: List[str], alignment_idxs: List[int]):
         """ Takes in headers (i.e. list of features where order of arrangement
             matters) & inserts buffer features in accordance to MFA defined 
             spacer indexes. Alignment indexes are sorted in ascending
@@ -393,17 +410,32 @@ class Preprocessor(BasePipe):
 
     def transform_defaults(
         self,
-        scaler=minmax_scale,
-        is_condensed=True,
-        X_alignments=None,
-        y_alignments=None
+        scaler: Callable = minmax_scale,
+        is_condensed: bool = True,
+        X_alignments: List[int] = None,
+        y_alignments: List[int] = None
     ):
-        """
+        """ Applies default transformation procedures on tabular and text 
+            datasets.
+
+        Args:
+            scaler   (func): Scaling function to be applied unto numerics
+            condense (bool): Whether to shrink targets to 2 classes
+            X_alignments (list(int)): Alignment indexes for features from MFA
+            y_alignments (list(int)): Alignment indexes for labels from MFA
+        Return:
+            X (np.ndarray)
+            y (np.ndarray)
+            X_header (list(str))
+            y_header (list(str))
         """
         X, y, X_header, y_header = super().transform(
             scaler=scaler,   
             is_condensed=is_condensed
         )
+
+        logging.debug(f"Transformed default headers: {X_header} {len(X_header)}")
+
         if X_alignments:
             X = self.align_dataset(X, X_alignments)
             X_header = self.align_header(X_header, X_alignments)
@@ -417,11 +449,23 @@ class Preprocessor(BasePipe):
 
     def transform_images(
         self, 
-        is_condensed=True,
-        X_alignments=None,
-        y_alignments=None
+        is_condensed: bool = True,
+        X_alignments: List[int] = None,
+        y_alignments: List[int] = None
     ):
-        """
+        """ Applies image-specific transformation procedures on a preprocessed
+            image dataset
+
+        Args:
+            scaler   (func): Scaling function to be applied unto numerics
+            condense (bool): Whether to shrink targets to 2 classes
+            X_alignments (list(int)): Alignment indexes for features from MFA
+            y_alignments (list(int)): Alignment indexes for labels from MFA
+        Return:
+            X (np.ndarray)
+            y (np.ndarray)
+            X_header (list(str))
+            y_header (list(str))
         """
         X, y, X_header, y_header = super().transform(
             scaler=None,    # deactivate default transformation
@@ -536,10 +580,10 @@ class Preprocessor(BasePipe):
 
     def transform(
         self, 
-        scaler=minmax_scale, 
-        is_condensed=True,
-        X_alignments=None,
-        y_alignments=None
+        scaler: Callable = minmax_scale,
+        is_condensed: bool = True,
+        X_alignments: List[int] = None,
+        y_alignments: List[int] = None
     ):
         """ In addition to the standard transformation that pipelines can
             execute, this implements the auto-alignment procedure by augmenting 
