@@ -420,7 +420,7 @@ class Preprocessor(BasePipe):
 
         Args:
             scaler   (func): Scaling function to be applied unto numerics
-            condense (bool): Whether to shrink targets to 2 classes
+            is_condensed (bool): Whether to shrink targets to 2 classes
             X_alignments (list(int)): Alignment indexes for features from MFA
             y_alignments (list(int)): Alignment indexes for labels from MFA
         Return:
@@ -434,7 +434,8 @@ class Preprocessor(BasePipe):
             is_condensed=is_condensed
         )
 
-        logging.debug(f"Transformed default headers: {X_header} {len(X_header)}")
+        logging.debug(f"Transformed default X headers: {X_header} {len(X_header)}")
+        logging.debug(f"Transformed default y headers: {y_header} {len(y_header)}")
 
         if X_alignments:
             X = self.align_dataset(X, X_alignments)
@@ -458,7 +459,7 @@ class Preprocessor(BasePipe):
 
         Args:
             scaler   (func): Scaling function to be applied unto numerics
-            condense (bool): Whether to shrink targets to 2 classes
+            is_condensed (bool): Whether to shrink targets to 2 classes
             X_alignments (list(int)): Alignment indexes for features from MFA
             y_alignments (list(int)): Alignment indexes for labels from MFA
         Return:
@@ -592,24 +593,46 @@ class Preprocessor(BasePipe):
 
         Args:
             scaler   (func): Scaling function to be applied unto numerics
-            condense (bool): Whether to shrink targets to 2 classes
+            is_condensed (bool): Whether to shrink targets to 2 classes
+            X_alignments (list(int)): Alignment indexes for features from MFA
+            y_alignments (list(int)): Alignment indexes for labels from MFA
         Returns:
             Aligned X_tensor (np.ndarray)
             Aligned X_tensor (np.ndarray)
             X_header         (list(str))
             y_header         (list(str))
         """
+        ###########################
+        # Implementation Footnote #
+        ###########################
+
+        # [Cause]
+        # When transforming dataset into an appropriate form based on the 
+        # orchestration context, target labels are prematurely condensed before
+        # their potential alignments.
+
+        # [Problems]
+        # Insertions of spacer columns AFTER condensing will result in y tensors
+        # that have wrong label dimensions (i.e. [n, 2]), which raises the 
+        # exception "RuntimeError: 1D target tensor expected, multi-target not 
+        # supported". This error occurs because the criterion used from PyTorch 
+        # during training MUST take in target values where Target: (N) where 
+        # each value is 0≤targets[i]≤C−1.
+
+        # [Solution]
+        # Manually condense tensor AFTER inserting alignment spacers
+
         if self.datatype in ["tabular", "text"]:
             X, y, X_header, y_header = self.transform_defaults(
                 scaler=scaler,
-                is_condensed=is_condensed,
+                is_condensed=False,  # DO NOT condense y labels first
                 X_alignments=X_alignments,
                 y_alignments=y_alignments
             )
 
         elif self.datatype == "image":
             X, y, X_header, y_header = self.transform_images(
-                is_condensed=is_condensed,
+                is_condensed=False,  # DO NOT condense y labels first
                 X_alignments=X_alignments,
                 y_alignments=y_alignments
             )
@@ -617,8 +640,14 @@ class Preprocessor(BasePipe):
         else:
             raise ValueError(f"Specified Datatype {self.datatype} is not supported!")
 
+        # Now condense labels into an appropriate form post-alignment
+        y = np.argmax(y, axis=1) if is_condensed else y
+        # is_multiclass = len(np.unique(y)) > 2
+        # logging.debug(f"Is multiclass? {is_multiclass}")
+
         X_tensor = th.Tensor(X)
-        y_tensor = th.Tensor(y)
+        y_tensor = th.Tensor(y).long() #if is_multiclass else th.Tensor(y).float()
+        logging.debug(f"Casted y_tensor: {y_tensor} {y_tensor.type()}")
 
         return X_tensor, y_tensor, X_header, y_header
 

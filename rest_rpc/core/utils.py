@@ -416,45 +416,81 @@ class Benchmarker:
         self.y_pred = y_pred
         self.y_score = y_score
 
+    ############
+    # Checkers #
+    ############
+
+    def is_multiclass(self):
+        """ Checks if the current experiment to be evaluated is from a binary or
+            multiclass setup
+
+        Returns
+            True    if setup is multiclass
+            False   otherwise
+        """
+        try:
+            return (
+                self.y_true.shape[1] > 1 and 
+                self.y_pred.shape[1] > 1 and  
+                self.y_score.shape[1] > 1
+            )
+        except IndexError:
+            return False
+
     ###########
     # Helpers #
     ###########
 
     @staticmethod
-    def find_multiclass_descriptors(
+    def _calculate_summary_stats(
         y_true: np.ndarray, 
-        y_pred: np.ndarray
+        y_pred: np.ndarray,
+        y_score: np.ndarray,
     ) -> Dict[str, List[Union[int, float]]]:
-        """ Finds the values of descriptors for all classes in a multiclass
-            setup. Descriptors are True Negatives (TNs), False Positives (FPs),
-            False Negatives (FNs) and True Positives (TPs).
+        """
 
         Args:
             y_true (np.ndarray)
-            y_true (np.ndarray)
+            y_pred (np.ndarray)
+            y_score (np.ndarray)
         Returns:
-            Descriptors (dict(str, list(int)))
+            Summary Statistics (dict(str, list(int)))
         """
-        # Calculate confusion matrix
-        cf_matrix = confusion_matrix(y_true, y_pred)
-        logging.debug(f"Confusion matrix: {cf_matrix}")
+        # Calculate accuracy of predictions
+        accuracy = accuracy_score(y_true, y_pred)
 
-        FPs = cf_matrix.sum(axis=0) - np.diag(cf_matrix)  
-        FNs = cf_matrix.sum(axis=1) - np.diag(cf_matrix)
-        TPs = np.diag(cf_matrix)
-        TNs = cf_matrix[:].sum() - (FPs + FNs + TPs)
-        logging.debug(f"TNs: {TNs}, FPs: {FPs}, FNs: {FNs}, TP: {TPs}")
+        # Calculate ROC-AUC for each label
+        try:
+            roc = roc_auc_score(y_true, y_score)
+            fpr, tpr, _ = roc_curve(y_true, y_score)
+        except ValueError:
+            roc = 0.0
+            fpr, tpr = (None, None)
+                
+        # Calculate Area under PR curve
+        pc_vals, rc_vals, _ = precision_recall_curve(y_true, y_score)
+        auc_pr_score = auc(rc_vals, pc_vals)
         
-        descriptors = {'TNs': TNs, 'FPs': FPs, 'FNs': FNs, 'TPs': TPs}
-        for des_type, descriptor_values in descriptors.items():
-            descriptors[des_type] = [
-                int(value) for value in descriptor_values
-            ]
-        return descriptors
+        # Calculate F-score
+        f_score = f1_score(y_true, y_pred)
 
+        # Calculate contingency matrix
+        ct_matrix = contingency_matrix(y_true, y_pred)
+        
+        statistics = {
+            'accuracy': float(accuracy),
+            'roc_auc_score': float(roc),
+            'pr_auc_score': float(auc_pr_score),
+            'f_score': float(f_score)
+        }
+
+        plots = {'roc_curve': [fpr, tpr], 'pr_curve': [pc_vals, rc_vals]}
+
+        return statistics
+          
 
     @staticmethod
-    def calculate_descriptive_rates(
+    def _calculate_descriptive_rates(
         TNs: List[int], 
         FPs: List[int], 
         FNs: List[int], 
@@ -518,9 +554,95 @@ class Benchmarker:
         return rates
 
 
-    def calculate_stats(self) -> Dict[str, List[Union[int, float]]]:
-        """ Calculates descriptive statistics of a training run. Statistics
-            supported include:
+    def _find_stratified_descriptors(
+        self
+    ) -> Dict[str, List[Union[int, float]]]:
+        """ Finds the values of descriptors for all classes in a multiclass
+            setup. Descriptors are True Negatives (TNs), False Positives (FPs),
+            False Negatives (FNs) and True Positives (TPs).
+
+        Returns:
+            Stratified Descriptors (dict(str, list(int)))
+        """
+        # Calculate confusion matrix
+        cf_matrix = confusion_matrix(
+            np.argmax(self.y_true, axis=1) if self.is_multiclass() else self.y_true,
+            np.argmax(self.y_pred, axis=1) if self.is_multiclass() else self.y_pred
+        )
+        logging.debug(f"Confusion matrix: {cf_matrix}")
+
+        FPs = cf_matrix.sum(axis=0) - np.diag(cf_matrix)  
+        FNs = cf_matrix.sum(axis=1) - np.diag(cf_matrix)
+        TPs = np.diag(cf_matrix)
+        TNs = cf_matrix[:].sum() - (FPs + FNs + TPs)
+        logging.debug(f"TNs: {TNs}, FPs: {FPs}, FNs: {FNs}, TP: {TPs}")
+        
+        descriptors = {'TNs': TNs, 'FPs': FPs, 'FNs': FNs, 'TPs': TPs}
+        for des_type, descriptor_values in descriptors.items():
+            descriptors[des_type] = [
+                int(value) for value in descriptor_values
+            ]
+        return descriptors
+
+
+    def _calculate_stratified_stats(
+        self
+    ) -> Dict[str, List[Union[int, float]]]:
+        """ Calculates descriptive statistics of a training run. Statistics 
+            supported are accuracy, roc_auc_score, pr_auc_score and f_score
+
+        Returns:
+            Stratified Statistics (dict(str, list(float)))
+        """
+        aggregated_statistics = {}
+        for col_true, col_pred, col_score in zip(
+            self.y_true.T, 
+            self.y_pred.T, 
+            self.y_score.T
+        ):
+            label_statistics = self._calculate_summary_stats(
+                y_true=col_true, 
+                y_pred=col_pred, 
+                y_score=col_score
+            )
+            for metric, value in label_statistics.items():
+                metric_collection = aggregated_statistics.get(metric, [])
+                metric_collection.append(value)
+                aggregated_statistics[metric] = metric_collection
+
+        return aggregated_statistics
+
+
+    def decode_ohe_dataset(self, dataset, header, alignment):
+        """ Reverses one-hot encoding applied on a dataset
+        """
+        raise NotImplementedError
+
+
+    def reconstruct_dataset(self):
+        """ Searches WebsocketServerWorker for dataset objects and their
+            corresponding predictions, before stitching them back into a 
+            single dataframe.
+        """
+        raise NotImplementedError
+
+    ##################
+    # Core Functions #
+    ##################
+
+    def reconstruct(self):
+        """ Given a mapping of dataset object IDs to their respective prediction
+            object IDs, reconstruct an aggregated dataset with predictions
+            mapped for client's perusal
+        """
+        raise NotImplementedError
+
+
+    def analyse(self):
+        """ Automates calculation of descriptive statistics over restored 
+            batched data. 
+            
+            Statistics supported include:
             1) accuracy,
             2) roc_auc_score
             3) pr_auc_score
@@ -540,75 +662,18 @@ class Benchmarker:
         Returns:
             Statistics (dict)
         """
-        # Calculate accuracy of predictions
-        accuracy = accuracy_score(self.y_true, self.y_pred)
-        
-        # Calculate ROC-AUC for each label
-        try:
-            roc = roc_auc_score(self.y_true, self.y_score)
-        except ValueError:
-            roc = 0.0
-        fpr, tpr, _ = roc_curve(self.y_true, self.y_score)
-                
-        # Calculate Area under PR curve
-        pc_vals, rc_vals, _ = precision_recall_curve(self.y_true, self.y_score)
-        auc_pr_score = auc(rc_vals, pc_vals)
-        
-        # Calculate F-score
-        f_score = f1_score(self.y_true, self.y_pred)
+        statistics = self._calculate_stratified_stats()
 
-        # Calculate contingency matrix
-        ct_matrix = contingency_matrix(self.y_true, self.y_pred)
-        
-        descriptors = self.find_multiclass_descriptors(self.y_true, self.y_pred)
-        rates = self.calculate_descriptive_rates(**descriptors)
-
-        statistics = {
-            'accuracy': float(accuracy),
-            'roc_auc_score': float(roc),
-            'pr_auc_score': float(auc_pr_score),
-            'f_score': float(f_score)
-        }
+        descriptors = self._find_stratified_descriptors()
+        rates = self._calculate_descriptive_rates(**descriptors)
         statistics.update(descriptors)
         statistics.update(rates)
 
-        plots = {'roc_curve': [fpr, tpr], 'pr_curve': [pc_vals, rc_vals]}
-        
         return statistics
-
-
-    def decode_ohe_dataset(self, dataset, header, alignment):
-        """ Reverses one-hot encoding applied on a dataset
-        """
-        pass
-
-    def reconstruct_dataset(self):
-        """ Searches WebsocketServerWorker for dataset objects and their
-            corresponding predictions, before stitching them back into a 
-            single dataframe.
-        """
-        pass
-
-    ##################
-    # Core Functions #
-    ##################
-
-    def reconstruct(self):
-        """ Given a mapping of dataset object IDs to their respective prediction
-            object IDs, reconstruct an aggregated dataset with predictions
-            mapped for client's perusal
-        """
-        pass
-
-
-    def analyse(self):
-        """ Automates calculation of descriptive statistics over restored 
-            batched data
-        """
-        pass
+        
 
 
     def export(self, out_dir):
         """ Exports reconstructed dataset to file for client's perusal
         """
-        pass
+        raise NotImplementedError

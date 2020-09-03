@@ -26,7 +26,6 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.stem import WordNetLemmatizer
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-from sklearn.preprocessing import LabelEncoder
 from symspellpy import SymSpell, Verbosity
 from tqdm import tqdm
 
@@ -197,10 +196,7 @@ class TextPipe(BasePipe):
 
         # Reformat outputs to dataframe
         word_vector_df = pd.DataFrame(data=doc_term_matrix, columns=vocabulary)
-        labelencoder = LabelEncoder()
-        word_vector_df['target'] = labelencoder.fit_transform(
-            df['target'].astype('category')
-        )
+        word_vector_df['target'] = df['target'].astype('category')
 
         return word_vector_df
 

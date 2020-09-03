@@ -215,7 +215,11 @@ class Poll(Resource):
                     os.makedirs(project_cache_dir, exist_ok=True)
 
                     (X_tensor, y_tensor, X_header, y_header, schema, df
-                    ) = load_and_combine(tags=tags, out_dir=project_cache_dir)
+                    ) = load_and_combine(
+                        tags=tags, 
+                        out_dir=project_cache_dir,
+                        is_condensed=False
+                    )
 
                     logging.debug(f"Polled X_header: {X_header}")
                     logging.debug(f"Polled y_header: {y_header}")

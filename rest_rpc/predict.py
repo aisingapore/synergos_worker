@@ -13,6 +13,7 @@ import jsonschema
 import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
+from sklearn.preprocessing import LabelBinarizer
 
 # Custom
 from rest_rpc import app
@@ -47,6 +48,8 @@ y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
 
+label_binarizer = LabelBinarizer()
+
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
@@ -77,10 +80,10 @@ prediction_input_model = ns_api.model(
 stats_model = ns_api.model(
     name="statistics",
     model={
-        'accuracy': fields.Float(),
-        'roc_auc_score': fields.Float(),
-        'pr_auc_score': fields.Float(),
-        'f_score': fields.Float(),
+        'accuracy': fields.List(fields.Float()),
+        'roc_auc_score': fields.List(fields.Float()),
+        'pr_auc_score': fields.List(fields.Float()),
+        'f_score': fields.List(fields.Float()),
         'TPRs': fields.List(fields.Float()),
         'TNRs': fields.List(fields.Float()),
         'PPVs': fields.List(fields.Float()),
@@ -264,20 +267,21 @@ class Prediction(Resource):
                         y_score = np.array(inference['y_score'])
 
                         # Retrieved aligned y_true labels
-                        path_to_labels = retrieved_metadata['exports'][meta]['y']
-                        with open(path_to_labels, 'rb') as yep:
-                            labels = np.load(yep)
-                        loaded_labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+                        # path_to_labels = retrieved_metadata['exports'][meta]['y']
+                        # with open(path_to_labels, 'rb') as yep:
+                        #     labels = np.load(yep)
+                        raw_labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+                        labels = label_binarizer.fit_transform(raw_labels) 
+        
+                        logging.debug(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}")
+                        logging.debug(f"Labels: {labels}, {type(labels)}, {labels.shape}")
+                        # logging.debug(f"Loaded Labels: {loaded_labels}, {type(loaded_labels)}, {loaded_labels.shape}")
 
-                        logging.debug(f"y_pred: {y_pred}")
-                        logging.debug(f"Labels: {labels}")
-                        logging.debug(f"Loaded Labels: {loaded_labels}")
-
-                        assert (labels == loaded_labels).all()
+                        # assert (labels == loaded_labels).all()
 
                         # Calculate inference statistics
                         benchmarker = Benchmarker(labels, y_pred, y_score)
-                        statistics = benchmarker.calculate_stats()
+                        statistics = benchmarker.analyse()
 
                         # Export predictions & scores for client's reference
                         y_pred_export_path = y_pred_template.safe_substitute(sub_keys)

@@ -18,7 +18,6 @@ import pandas as pd
 import xgboost as xgb
 import catboost as cat
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom

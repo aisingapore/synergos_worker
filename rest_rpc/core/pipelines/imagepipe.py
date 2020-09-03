@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from PIL import Image
-from sklearn.preprocessing import minmax_scale, MinMaxScaler, LabelEncoder
+from sklearn.preprocessing import LabelEncoder
 
 # Custom
 from rest_rpc.core.pipelines.base import BasePipe
@@ -146,12 +146,7 @@ class ImagePipe(BasePipe):
             all_images += class_images
 
         aggregated_df = pd.concat(all_images)
-        
-        # Ensure that all classes are numerically represented
-        labelencoder = LabelEncoder()
-        aggregated_df['target'] = labelencoder.fit_transform(
-            aggregated_df['target'].astype('category')
-        )
+        aggregated_df['target'] = aggregated_df['target'].astype('category')
 
         return aggregated_df
 

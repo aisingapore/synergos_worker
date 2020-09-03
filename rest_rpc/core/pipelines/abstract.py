@@ -53,6 +53,7 @@ class AbstractPipe(abc.ABC):
         pass
     
     
+    @abc.abstractmethod
     def export(self, des_dir: str):
         """ Exports the interpolated dataset.
             Note: Exported dataset is not one-hot encoded for extensibility
@@ -67,6 +68,7 @@ class AbstractPipe(abc.ABC):
         pass
         
     
+    @abc.abstractmethod
     def reset(self):
         """ Resets interpolations preprocessing
 

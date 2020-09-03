@@ -165,7 +165,8 @@ class BasePipe(AbstractPipe):
         features = self.output.drop(columns=['target'])
         targets = self.output[['target']].copy()
 
-        logging.debug(f"Datatypes: {features.dtypes.to_dict()}")
+        logging.debug(f"Feature datatypes: {features.dtypes.to_dict()}")
+        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}")
 
         if is_ohe:
             features = pd.get_dummies(features)
@@ -175,15 +176,14 @@ class BasePipe(AbstractPipe):
             logging.debug(f"Sorted features: {features.columns}")
             logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}")
 
-        # Target values have to be one-hot encoded regardless of OHE-preference
-        ohe_targets = pd.get_dummies(targets)
-        if is_condensed:
-            median_target = targets.target.median()
-            targets.loc[:,'target'] = targets.target.apply(
-                lambda x: int(x > median_target)
-            )
-            ohe_targets = pd.get_dummies(targets, drop_first=True)
-        targets = ohe_targets
+        # Compress if there are only 2 available class labels
+        # # Target values have to be one-hot encoded regardless of OHE-preference
+        # class_label_count = targets.target.nunique()
+        # if not (is_condensed and class_label_count == 2):
+        #     targets = pd.get_dummies(targets)
+
+        if not is_condensed:
+            targets = pd.get_dummies(targets)
 
         feat_vals = scaler(features.values) if scaler else features.values
         target_vals = targets.values

@@ -306,14 +306,16 @@ class PipeData:
     # Core Functions #
     ##################
 
-    def compute(self) -> pd.DataFrame:
+    def compute(self) -> Dict[str, pd.DataFrame]:
         """ Resolves and load datasets according to filepaths and concatenate
-            them into a single dataframe
+            them into a single dataframe representative of each supported type
+            of data (i.e. tabular, image, text)
 
         Return:
-            Combined data (pd.DataFrame)
+            Combined meta datasets (dict(str, pd.DataFrame))
         """
         return {
             _type: self.__combine_data(singletons) 
             for _type, singletons in self.data.items()
+            if singletons 
         }

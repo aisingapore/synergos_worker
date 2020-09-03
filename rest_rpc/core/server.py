@@ -29,6 +29,7 @@ from rest_rpc.core.pipelines import (
     ImagePipe, 
     TextPipe
 )
+from rest_rpc.core.custom import CustomServerWorker
 
 ##################
 # Configurations #
@@ -36,9 +37,13 @@ from rest_rpc.core.pipelines import (
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
+# Avoid Pytorch deadlock issues
+th.set_num_threads(1)
+
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 hook = sy.TorchHook(th, verbose=False) # toggle where necessary
+hook.local_worker.is_client_worker = False
 
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
@@ -72,7 +77,7 @@ def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
     """
     # Searches the data directory for all metadata specifications
     all_metadata_paths = list(Path(data_dir).glob("**/metadata.json"))
-
+    logging.debug(f"all_metadata_paths: {all_metadata_paths}")
     for meta_path in all_metadata_paths:
 
         if set(tag).issubset(set(meta_path.parts)):
@@ -266,7 +271,8 @@ def load_and_combine(
     tags,         
     X_alignments: List[str] = None,
     y_alignments: List[str] = None,
-    out_dir=out_dir
+    is_condensed: bool = False,
+    out_dir: str = out_dir
 ):
     """ Loads in all datasets found along the corresponding subdirectory
         sequence defined by the specified tags, and combines them into a single
@@ -286,7 +292,7 @@ def load_and_combine(
         Combined Schema (dict(str))
         combined_df (pd.DataFrame)
     """
-    aggregate_des_dir = os.path.join(
+    aggregate_des_dir = os.path.join( 
         out_dir, 
         "aggregates",
         "-".join([token for tag in tags for token in tag])
@@ -326,12 +332,14 @@ def load_and_combine(
             y_combined_header
         ) = preprocessor.transform(
             X_alignments=X_alignments,
-            y_alignments=y_alignments
+            y_alignments=y_alignments,
+            is_condensed=is_condensed # before MFA, data MUST NOT be condensed
         )
 
         # preprocessor.offload()
 
         logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}")
+        logging.debug(f"y_combined_header: {y_combined_header} {len(y_combined_header)}")
 
         return (
             X_combined_tensor, 
@@ -367,8 +375,12 @@ def annotate(X, y, id, meta):
 
     return X_annotated, y_annotated
 
+# @sy,
+# def create_training_template():
+#     """
+#     """
 
-def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
+def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
     """ helper function for spinning up a websocket participant 
     
     Args:
@@ -393,31 +405,36 @@ def start_proc(participant=WebsocketServerWorker, out_dir=out_dir, **kwargs):
     final_datasets = tuple()
     for meta, tags in all_tags.items():
 
-        feature_alignment = all_alignments[meta]['X']
-        target_alignment = all_alignments[meta]['y']
-        logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
-       
-        X_aligned, y_aligned, _, _, _, _ = load_and_combine(
-            tags=tags,
-            X_alignments=feature_alignment,
-            y_alignments=target_alignment,
-            out_dir=out_dir
-        )
-        logging.debug(f"Start process - X shape: {X_aligned.shape}")
+        if tags:
 
-        X_aligned_annotated, y_aligned_annotated = annotate(
-            X=X_aligned, 
-            y=y_aligned, 
-            id=kwargs['id'], 
-            meta=f"{meta}"
-        )
+            feature_alignment = all_alignments[meta]['X']
+            target_alignment = all_alignments[meta]['y']
+            logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
+        
+            X_aligned, y_aligned, _, _, _, _ = load_and_combine(
+                tags=tags,
+                X_alignments=feature_alignment,
+                y_alignments=target_alignment,
+                is_condensed=True, # After MFA, data MUST be condensed!
+                out_dir=out_dir
+            )
+            
+            logging.debug(f"Start process - X shape: {X_aligned.shape} {X_aligned.type()}")
+            logging.debug(f"Start process - y shape: {y_aligned.shape} {y_aligned.type()}")
 
-        X_aligned_annotated = X_aligned_annotated.to(device)
-        y_aligned_annotated = y_aligned_annotated.to(device)
+            X_aligned_annotated, y_aligned_annotated = annotate(
+                X=X_aligned, 
+                y=y_aligned, 
+                id=kwargs['id'], 
+                meta=f"{meta}"
+            )
 
-        final_datasets += (X_aligned_annotated, y_aligned_annotated)
+            X_aligned_annotated = X_aligned_annotated.to(device)
+            y_aligned_annotated = y_aligned_annotated.to(device)
 
-        logging.debug(f"Loaded {meta} data: {X_aligned_annotated, y_aligned_annotated}")
+            final_datasets += (X_aligned_annotated, y_aligned_annotated)
+
+            logging.debug(f"Loaded {meta} data: {X_aligned_annotated, y_aligned_annotated}")
 
     kwargs['data'] = final_datasets  #[X, y]
     logging.info(f"Worker metadata: {kwargs}")
