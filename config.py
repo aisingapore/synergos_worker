@@ -14,7 +14,6 @@ This is because Flask-restx will only load all uppercase variables from
 import json
 import logging
 import os
-import psutil
 import random
 import subprocess
 import sys
@@ -27,6 +26,7 @@ from typing import Dict
 
 # Libs
 import numpy as np
+import psutil
 import torch as th
 
 ##################
@@ -64,6 +64,36 @@ def seed_everything(seed: int = 42) -> bool:
 
     except:
         return False
+
+
+def count_available_gpus() -> int:
+    """ Counts no. of attached GPUs devices in the current system. As GPU 
+        support is supplimentary, if any exceptions are caught here, system
+        defaults back to CPU-driven processes (i.e. gpu count is 0)
+
+    Returns:
+        gpu_count (int)
+    """
+    try:
+        process = subprocess.run(
+            ['lspci'],
+            check=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True
+        )
+        all_detected_devices = process.stdout.split('\n')
+        gpus = [
+            device 
+            for device in all_detected_devices 
+            if ('VGA' in device) or ('Display' in device)
+        ]
+        return len(gpus)
+
+    except subprocess.CalledProcessError as cpe:
+        logging.warning(f"Could not detect GPUs! Error: {cpe}")
+        logging.warning(f"Defaulting to CPU processing instead...")
+        return 0
 
 
 def detect_configurations(dirname: str) -> Dict[str, str]:
@@ -144,12 +174,17 @@ CACHE = infinite_nested_dict()
 # Allocate no. of cores for processes
 CORES_USED = psutil.cpu_count(logical=True) - 1
 
+# Detect no. of GPUs attached to server
+GPU_COUNT = count_available_gpus()
+
 logging.debug(f"Is master node? {IS_MASTER}")
 logging.debug(f"Input directory detected: {IN_DIR}")
 logging.debug(f"Output directory detected: {OUT_DIR}")
 logging.debug(f"Data directory detected: {DATA_DIR}")
 logging.debug(f"Test directory detected: {TEST_DIR}")
 logging.debug(f"Cache initialised: {CACHE}")
+logging.debug(f"No. of available CPU Cores: {CORES_USED}")
+logging.debug(f"No. of available GPUs: {GPU_COUNT}")
 
 #########################################
 # PySyft Worker Database Configurations #

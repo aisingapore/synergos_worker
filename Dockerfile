@@ -61,7 +61,10 @@
 FROM python:3.7.4-slim-buster as base
 
 RUN apt-get update
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential \
+    git\
+    pciutils
 
 COPY requirements.txt ./
 
@@ -73,6 +76,31 @@ WORKDIR /worker
 
 EXPOSE 5000
 EXPOSE 8020
+
+################################################
+# Implementation Footnote - Poetry Integration #
+################################################
+
+# Problem:
+# Poetry is a deterministic way of managing dependency installations. However,
+# there seems to be trouble in installing Tensorflow, as documented under issue
+# #1331 (https://github.com/python-poetry/poetry/issues/1330). 
+# Solution: K.I.V until issue is resolved
+
+# FROM python:3.7-slim as base
+
+# RUN apt-get update
+# RUN DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential git python3-pip
+
+# RUN pip install --upgrade setuptools wheel poetry
+
+# ADD . /worker
+# WORKDIR /worker
+
+# RUN poetry install
+
+# # Quick fix for tensorflow installation with Poetry
+# RUN poetry add tensorflow@1.15.0 tf-encrypted@0.5.9
 
 ########################
 # New Image - Debugger #
