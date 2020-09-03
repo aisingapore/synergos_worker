@@ -6,6 +6,7 @@
 
 # Generic/Built-in
 import asyncio
+import binascii
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ from typing import Dict, List, Tuple, Union
 import pandas as pd
 import syft as sy
 import torch as th
-from syft.generic.tensor import AbstractTensor
+from syft.generic.abstract.tensor import AbstractTensor
 from syft.workers.websocket_server import WebsocketServerWorker
 
 
@@ -84,52 +85,87 @@ class CustomServerWorker(WebsocketServerWorker):
             key_path=key_path
         )
         
+        # Avoid Pytorch deadlock issues
+        th.set_num_threads(1)
 
-    def fit(self, dataset_key: str, device: str = "cpu", **kwargs):
-        """Fits a model on the local dataset as specified in the local TrainConfig object.
+    # def fit(self, dataset_key: str, device: str = "cpu", **kwargs):
+    #     """Fits a model on the local dataset as specified in the local TrainConfig object.
+    #     Args:
+    #         dataset_key: Identifier of the local dataset that shall be used for training.
+    #         **kwargs: Unused.
+    #     Returns:
+    #         loss: Training loss on the last batch of training data.
+    #     """
+    #     self._check_train_config()
+
+    #     if dataset_key not in self.datasets:
+    #         raise ValueError("Dataset {} unknown.".format(dataset_key))
+
+    #     model = self.get_obj(self.train_config._model_id).obj
+    #     loss_fn = self.get_obj(self.train_config._loss_fn_id).obj
+
+    #     self._build_optimizer(
+    #         self.train_config.optimizer, model, optimizer_args=self.train_config.optimizer_args
+    #     )
+
+    #     return self._fit(model=model, dataset_key=dataset_key, loss_fn=loss_fn, device=device)
+
+    # def _fit(self, model, dataset_key, loss_fn, device="cpu"):
+    #     model.train()
+    #     data_loader = self._create_data_loader(
+    #         dataset_key=dataset_key, shuffle=self.train_config.shuffle
+    #     )
+
+    #     loss = None
+    #     iteration_count = 0
+
+    #     for _ in range(self.train_config.epochs):
+    #         for (data, target) in data_loader:
+    #             # Set gradients to zero
+    #             self.optimizer.zero_grad()
+
+    #             # Update model
+    #             output = model(data.to(device))
+    #             loss = loss_fn(target=target.to(device), pred=output)
+    #             loss.backward()
+    #             self.optimizer.step()
+
+    #             # Update and check interation count
+    #             iteration_count += 1
+    #             if iteration_count >= self.train_config.max_nr_batches >= 0:
+    #                 break
+
+    #     return loss
+
+
+    async def _producer_handler(self, websocket):
+        """This handler listens to the queue and processes messages as they
+        arrive.
         Args:
-            dataset_key: Identifier of the local dataset that shall be used for training.
-            **kwargs: Unused.
-        Returns:
-            loss: Training loss on the last batch of training data.
+            websocket: the connection object we use to send responses
+                back to the client.
         """
-        self._check_train_config()
+        while True:
 
-        if dataset_key not in self.datasets:
-            raise ValueError("Dataset {} unknown.".format(dataset_key))
+            logging.debug(f"Cummulated messages: {self.broadcast_queue}")
 
-        model = self.get_obj(self.train_config._model_id).obj
-        loss_fn = self.get_obj(self.train_config._loss_fn_id).obj
+            # get a message from the queue
+            message = await self.broadcast_queue.get()
 
-        self._build_optimizer(
-            self.train_config.optimizer, model, optimizer_args=self.train_config.optimizer_args
-        )
+            try:
+                # convert that string message to the binary it represent
+                message = binascii.unhexlify(message[2:-1])
+            except binascii.Error as be:
+                logging.debug(f"Erroneous message: {message}")
+                logging.error(f"{be}")
+                raise Exception
 
-        return self._fit(model=model, dataset_key=dataset_key, loss_fn=loss_fn, device=device)
+            # process the message
+            response = self._recv_msg(message)
 
-    def _fit(self, model, dataset_key, loss_fn, device="cpu"):
-        model.train()
-        data_loader = self._create_data_loader(
-            dataset_key=dataset_key, shuffle=self.train_config.shuffle
-        )
+            # convert the binary to a string representation
+            # (this is needed for the websocket library)
+            response = str(binascii.hexlify(response))
 
-        loss = None
-        iteration_count = 0
-
-        for _ in range(self.train_config.epochs):
-            for (data, target) in data_loader:
-                # Set gradients to zero
-                self.optimizer.zero_grad()
-
-                # Update model
-                output = model(data.to(device))
-                loss = loss_fn(target=target.to(device), pred=output)
-                loss.backward()
-                self.optimizer.step()
-
-                # Update and check interation count
-                iteration_count += 1
-                if iteration_count >= self.train_config.max_nr_batches >= 0:
-                    break
-
-        return loss
+            # send the response
+            await websocket.send(response)
