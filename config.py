@@ -20,6 +20,7 @@ import sys
 import zipfile
 from collections import defaultdict, OrderedDict
 from glob import glob
+from multiprocessing import Manager
 from string import Template
 from pathlib import Path
 from typing import Dict
@@ -169,7 +170,7 @@ CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
-CACHE = infinite_nested_dict()
+CACHE = Manager().dict()#infinite_nested_dict()
 
 # Allocate no. of cores for processes
 CORES_USED = psutil.cpu_count(logical=True) - 1

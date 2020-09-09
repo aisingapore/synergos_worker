@@ -171,6 +171,7 @@ class Initialisation(Resource):
             # Check that specified experiment run is not already running
             if not cache[project_id]:
 
+                # try:
                 project_cache_dir = os.path.join(
                     outdir_template.safe_substitute(project_id=project_id), 
                     "cache"
@@ -184,6 +185,9 @@ class Initialisation(Resource):
 
                 cache[project_id]['process'] = wssw_process
                 cache[project_id]['participant'] = wss_worker
+                
+                # except OSError:
+                #     pass
                 
                 # Created a resource        --> 201
                 status = 201
