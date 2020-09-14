@@ -170,7 +170,7 @@ CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
-CACHE = Manager().dict()#infinite_nested_dict()
+CACHE = infinite_nested_dict() # Manager().dict()
 
 # Allocate no. of cores for processes
 CORES_USED = psutil.cpu_count(logical=True) - 1
