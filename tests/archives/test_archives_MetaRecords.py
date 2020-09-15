@@ -6,11 +6,10 @@
 
 # Generic/Built-in
 import os
-from datetime import datetime, timedelta
 from pathlib import Path
 
 # Libs
-from tinydb import where
+
 
 # Custom
 from rest_rpc import app
@@ -94,7 +93,11 @@ project_id = "eicu_hospital_collab"
 expt_id = "2_layer_nn"
 run_id = "run_001"
 
-test_db_path = os.path.join(app.config['TEST_DIR'], "test_database.json")
+test_db_path = os.path.join(
+    app.config['TEST_DIR'], 
+    "archives", 
+    "test_database.json"
+)
 
 #########################
 #  Evaluation Functions #
