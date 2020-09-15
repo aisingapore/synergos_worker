@@ -31,29 +31,49 @@ class DateTimeSerializer(Serializer):
     """
     OBJ_CLASS = datetime
 
-    def encode(self, obj):
+    def encode(self, obj: datetime) -> str:
         """ Serialize naive datetimes objects without conversion but with 'N' 
-            for 'Naive' appended. Convert aware datetime objects to UTC and then
-            serialize them with 'A' for 'Aware' appended.
+            for 'Naive' appended. Convert aware datetime objects to UTC if their
+            timezone specified was UTC, otherwise convert them to the detected
+            local timezone.
+
+        Args:
+            obj (datetime.datetime): Datetime object to be encoded
+        Returns:
+            Serialized datetime string (str)
         """
         if obj.tzinfo is None:
             return obj.strftime('%Y-%m-%d %H:%M:%S N')
         else:
-            return obj.astimezone(tzutc()).strftime('%Y-%m-%d %H:%M:%S A')
+            return obj.strftime('%Y-%m-%d %H:%M:%S %Z')
 
-    def decode(self, s):
-        """ Return the serialization as a datetime object. If the serializaton 
-            ends with 'A',  first converting to localtime and returning an aware 
-            datetime object. If the serialization ends with 'N', returning 
-            without conversion as a naive datetime object. 
+    def decode(self, s: str) -> str:
+        """ Return the serialization as a datetime object. If the serialization 
+            ends with 'N', return without conversion as a naive datetime object.
+            However, if a timezone is detected, serialisation is returned as
+            UTC casted if the UTC timezone detected, otherwise serialisation is
+            returned with local timezone casted
+
+        Args:
+            s (str): Serialized datetime string
+        Returns:
+            Decoded datetime object
         """
-        if s[-1] == 'A':
-            return datetime.strptime(
-                s[:-2], 
-                '%Y-%m-%d %H:%M:%S'
-            ).replace(tzinfo=tzutc()).astimezone(tzlocal())
-        else:
+        if s[-1] == 'N': 
+            # Handle naive cases
             return datetime.strptime(s[:-2], '%Y-%m-%d %H:%M:%S')
+        
+        elif s[-3:] == 'UTC':
+            # Handle UTC timezone
+            return datetime.strptime(
+                s, '%Y-%m-%d %H:%M:%S %Z'
+            ).replace(tzinfo=tzutc())
+            
+        else: 
+            # Handle local timezones
+            return datetime.strptime(
+                s, '%Y-%m-%d %H:%M:%S %Z'
+            ).replace(tzinfo=tzlocal())
 
 
 class TimeDeltaSerializer(Serializer):
