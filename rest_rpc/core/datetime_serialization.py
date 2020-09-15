@@ -82,11 +82,23 @@ class TimeDeltaSerializer(Serializer):
     """
     OBJ_CLASS = timedelta  # The class handles timedelta objects
 
-    def encode(self, obj):
-        """ Serialize the timedelta object as days.seconds. """
+    def encode(self, obj: timedelta) -> str:
+        """ Serialize the timedelta object as '{days}.{seconds}'. 
+        
+        Args:
+            obj (datetime.timedelta): Timedelta object to be serialized
+        Returns:
+            Serialized timedelta string (str)
+        """
         return "{0}.{1}".format(obj.days, obj.seconds)
 
-    def decode(self, s):
-        """ Return the serialization as a timedelta object """
+    def decode(self, s: str) -> timedelta:
+        """ Return the serialization as a timedelta object 
+        
+        Args:
+            s (str): Serialized timedelta string
+        Returns:
+            Decoded timedelta object
+        """
         days_seconds = (int(x) for x in s.split('.')) 
         return timedelta(*days_seconds)
