@@ -12,7 +12,6 @@ from datetime import timedelta
 
 
 # Custom
-from rest_rpc import app
 from rest_rpc.core.datetime_serialization import TimeDeltaSerializer
 
 ##################

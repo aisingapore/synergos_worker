@@ -12,7 +12,6 @@ from dateutil.tz import tzutc, tzlocal
 
 
 # Custom
-from rest_rpc import app
 from rest_rpc.core.datetime_serialization import DateTimeSerializer
 
 ##################
