@@ -410,6 +410,7 @@ class Preprocessor(BasePipe):
 
     def transform_defaults(
         self,
+        action: str,
         scaler: Callable = minmax_scale,
         is_condensed: bool = True,
         X_alignments: List[int] = None,
@@ -430,6 +431,7 @@ class Preprocessor(BasePipe):
             y_header (list(str))
         """
         X, y, X_header, y_header = super().transform(
+            action=action,
             scaler=scaler,   
             is_condensed=is_condensed
         )
@@ -450,6 +452,7 @@ class Preprocessor(BasePipe):
 
     def transform_images(
         self, 
+        action: str,
         is_condensed: bool = True,
         X_alignments: List[int] = None,
         y_alignments: List[int] = None
@@ -469,6 +472,7 @@ class Preprocessor(BasePipe):
             y_header (list(str))
         """
         X, y, X_header, y_header = super().transform(
+            action=action,
             scaler=None,    # deactivate default transformation
             is_sorted=False,# No sorting since it destroys convolution
             is_ohe=False,   # No OHE for image pixels
@@ -581,6 +585,7 @@ class Preprocessor(BasePipe):
 
     def transform(
         self, 
+        action,
         scaler: Callable = minmax_scale,
         is_condensed: bool = True,
         X_alignments: List[int] = None,
@@ -624,6 +629,7 @@ class Preprocessor(BasePipe):
 
         if self.datatype in ["tabular", "text"]:
             X, y, X_header, y_header = self.transform_defaults(
+                action=action,
                 scaler=scaler,
                 is_condensed=False,  # DO NOT condense y labels first
                 X_alignments=X_alignments,
@@ -632,6 +638,7 @@ class Preprocessor(BasePipe):
 
         elif self.datatype == "image":
             X, y, X_header, y_header = self.transform_images(
+                action=action,
                 is_condensed=False,  # DO NOT condense y labels first
                 X_alignments=X_alignments,
                 y_alignments=y_alignments
@@ -640,13 +647,51 @@ class Preprocessor(BasePipe):
         else:
             raise ValueError(f"Specified Datatype {self.datatype} is not supported!")
 
-        # Now condense labels into an appropriate form post-alignment
-        y = np.argmax(y, axis=1) if is_condensed else y
-        # is_multiclass = len(np.unique(y)) > 2
-        # logging.debug(f"Is multiclass? {is_multiclass}")
+        ###########################
+        # Implementation Footnote #
+        ###########################
+
+        # [Cause]
+        # In order to manually condense tensor labels, the type of machine
+        # learning operation has to first be known. For example, in a regression
+        # problem, the targets are simply prediction values; these values cannot
+        # be OHE-ed, compressed, or aligned. However, in a classification 
+        # problem, there can be binary or multi-class classification. Even here
+        # there is a distinct difference in treatment - binary class labels
+        # exists as a single column of [0, 1] (i.e. compressed), while 
+        # multi-class labels are to be OHE-ed (i.e. uncompressed with multiple
+        # columns). Furthermore, in PyTorch criterions, classification labels
+        # are expected to be casted into long values, while regression values
+        # are expected to be casted into floats. 
+
+        # [Problems]
+        # Without explicitly stating the machine learning action to be executed,
+        # labels are not handled properly, either being inappropriately 
+        # expanded/compressed, or not expressed in the correct datatype/form. 
+        # This results in criterion errors raised during the federated cycle 
+        # over at the TTP
+
+        # [Solution]
+        # Add a parameter that explicitly specifies the machine learning 
+        # operation to be handled, and take the appropriate action.
 
         X_tensor = th.Tensor(X)
-        y_tensor = th.Tensor(y).long() #if is_multiclass else th.Tensor(y).float()
+
+        if action == 'regress':
+            # No need for OHE or argmax
+            y_tensor = th.Tensor(y).float()
+
+        elif action == 'classify':
+            if y.shape[1] < 2:
+                raise RuntimeError('At least 2 classes MUST be specified!') 
+
+            # Now condense labels into an appropriate form post-alignment
+            y = np.argmax(y, axis=1) if is_condensed else y
+            y_tensor = th.Tensor(y).long()
+        
+        else:
+            raise ValueError(f"ML action {action} is not supported!")
+
         logging.debug(f"Casted y_tensor: {y_tensor} {y_tensor.type()}")
 
         return X_tensor, y_tensor, X_header, y_header

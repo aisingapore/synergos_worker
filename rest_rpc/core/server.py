@@ -268,6 +268,7 @@ def load_dataset(tag, out_dir=out_dir):
 
 
 def load_and_combine(
+    action,
     tags,         
     X_alignments: List[str] = None,
     y_alignments: List[str] = None,
@@ -331,6 +332,7 @@ def load_and_combine(
             X_combined_header, 
             y_combined_header
         ) = preprocessor.transform(
+            action=action,
             X_alignments=X_alignments,
             y_alignments=y_alignments,
             is_condensed=is_condensed # before MFA, data MUST NOT be condensed
@@ -399,6 +401,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
         """
         server.start()
         
+    action = kwargs.pop('action')
     all_tags = kwargs.pop('tags')
     all_alignments = kwargs.pop('alignments')
 
@@ -412,6 +415,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
             logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
         
             X_aligned, y_aligned, _, _, _, _ = load_and_combine(
+                action=action,
                 tags=tags,
                 X_alignments=feature_alignment,
                 y_alignments=target_alignment,

@@ -61,6 +61,7 @@ init_input_model = ns_api.inherit(
     "initialisation_input",
     server_model,
     {
+        'action': fields.String(),
         'tags': fields.Nested(tag_model),
         'alignments': fields.Nested(alignment_model)
     }
@@ -111,22 +112,24 @@ class Initialisation(Resource):
             this worker container
             
             JSON received will contain the following information:
-            1) Run ID
-            2) Worker ID
-            3) Host IP
-            4) Host Port
+            1) Worker ID
+            2) Worker IP
+            3) Worker Port
+            4) Logging toggle
             5) Verbosity
+            6) Machine learning action to be executed
             6) Tags
             7) Alignments
 
             eg.
 
             {
+                "id": "worker_0",
                 "host": "0.0.0.0"
                 "port": 8020,
-                "id": "worker_0",
                 "log_msgs": true,
                 "verbose": true,
+                "action": "classify",
                 "tags": {
                     "train": [["type_a","v2"], ["type_b","v3"]],
                     "evaluate": [["type_c", "v1"]]

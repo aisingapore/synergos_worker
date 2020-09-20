@@ -13,7 +13,6 @@ import jsonschema
 import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
-from sklearn.preprocessing import LabelBinarizer
 
 # Custom
 from rest_rpc import app
@@ -48,31 +47,33 @@ y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
 
-label_binarizer = LabelBinarizer()
-
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
 
 # Marshalling Inputs
-prediction_tags_model = ns_api.model(
-    name="prediction_tags",
+y_values_model = ns_api.model(
+    name="y_values",
     model={
-        'data': fields.Integer(required=True),
-        'labels': fields.Integer(required=True),
-        'outputs': fields.Integer(required=True),
-        'predictions': fields.Integer(required=True)
+        'y_pred': fields.Raw(required=True),
+        'y_score': fields.Raw(required=True)
+    }
+)
+
+inferences_model = ns_api.model(
+    name="inferences",
+    model={
+        'train': fields.Nested(y_values_model, skip_none=True),
+        'evaluate': fields.Nested(y_values_model, skip_none=True),
+        'predict': fields.Nested(y_values_model, skip_none=True)
     }
 )
 
 prediction_input_model = ns_api.model(
     name="prediction_input",
     model={
-        'alignments': fields.Nested(alignment_model, required=True),
-        'id_mappings': fields.List(fields.Nested(
-            prediction_tags_model,
-            required=True
-        ))
+        'action': fields.String(required=True),
+        'inferences': fields.Nested(inferences_model, required=True)
     }
 )
 
@@ -80,6 +81,9 @@ prediction_input_model = ns_api.model(
 stats_model = ns_api.model(
     name="statistics",
     model={
+        'R2': fields.Float(),
+        'MSE': fields.Float(),
+        'MAE': fields.Float(),
         'accuracy': fields.List(fields.Float()),
         'roc_auc_score': fields.List(fields.Float()),
         'pr_auc_score': fields.List(fields.Float()),
@@ -95,7 +99,8 @@ stats_model = ns_api.model(
         'TNs': fields.List(fields.Integer()),
         'FPs': fields.List(fields.Integer()),
         'FNs': fields.List(fields.Integer())
-    }
+    },
+    skip_none=True
 )
 
 meta_stats_model = ns_api.model(
@@ -106,8 +111,8 @@ meta_stats_model = ns_api.model(
     }
 )
 
-inferences_model = ns_api.model(
-    name="inferences",
+metrics_model = ns_api.model(
+    name="metrics",
     model={
         'train': fields.Nested(meta_stats_model, skip_none=True),
         'evaluate': fields.Nested(meta_stats_model, skip_none=True),
@@ -115,7 +120,7 @@ inferences_model = ns_api.model(
     }
 )
 
-combination_field = fields.Wildcard(fields.Nested(inferences_model))
+combination_field = fields.Wildcard(fields.Nested(metrics_model))
 combination_model = ns_api.model(
     name="combination",
     model={"*": combination_field}
@@ -162,7 +167,7 @@ payload_formatter = Payload('Predict', ns_api, prediction_output_model)
 class Prediction(Resource):
 
     @ns_api.doc("predict_data")
-    # @ns_api.expect(prediction_input_model)
+    @ns_api.expect(prediction_input_model)
     @ns_api.marshal_with(payload_formatter.singular_model)
     def post(self, project_id, expt_id, run_id):
         """ Receives and reconstructs test dataset to pair with prediction 
@@ -182,6 +187,7 @@ class Prediction(Resource):
             eg.
 
             {
+                "action": "classify",
                 "inferences": {
                     "train": {},
                     "evaluate": {
@@ -244,6 +250,8 @@ class Prediction(Resource):
             logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}")
 
             try:
+                action = request.json['action']
+
                 results = {}
                 for meta, inference in request.json['inferences'].items():
 
@@ -267,21 +275,14 @@ class Prediction(Resource):
                         y_score = np.array(inference['y_score'])
 
                         # Retrieved aligned y_true labels
-                        # path_to_labels = retrieved_metadata['exports'][meta]['y']
-                        # with open(path_to_labels, 'rb') as yep:
-                        #     labels = np.load(yep)
-                        raw_labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
-                        labels = label_binarizer.fit_transform(raw_labels) 
-        
+                        labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+
                         logging.debug(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}")
                         logging.debug(f"Labels: {labels}, {type(labels)}, {labels.shape}")
-                        # logging.debug(f"Loaded Labels: {loaded_labels}, {type(loaded_labels)}, {loaded_labels.shape}")
-
-                        # assert (labels == loaded_labels).all()
 
                         # Calculate inference statistics
                         benchmarker = Benchmarker(labels, y_pred, y_score)
-                        statistics = benchmarker.analyse()
+                        statistics = benchmarker.analyse(action=action)
 
                         # Export predictions & scores for client's reference
                         y_pred_export_path = y_pred_template.safe_substitute(sub_keys)

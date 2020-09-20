@@ -124,7 +124,8 @@ class BasePipe(AbstractPipe):
 
 
     def transform(
-        self, 
+        self,
+        action: str,
         scaler: Callable = minmax_scale, 
         is_sorted: bool = True,
         is_ohe: bool = True,
@@ -163,10 +164,7 @@ class BasePipe(AbstractPipe):
             raise RuntimeError("Data must first be processed!")
         
         features = self.output.drop(columns=['target'])
-        targets = self.output[['target']].copy()
-
         logging.debug(f"Feature datatypes: {features.dtypes.to_dict()}")
-        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}")
 
         if is_ohe:
             features = pd.get_dummies(features)
@@ -176,14 +174,53 @@ class BasePipe(AbstractPipe):
             logging.debug(f"Sorted features: {features.columns}")
             logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}")
 
-        # Compress if there are only 2 available class labels
-        # # Target values have to be one-hot encoded regardless of OHE-preference
-        # class_label_count = targets.target.nunique()
-        # if not (is_condensed and class_label_count == 2):
-        #     targets = pd.get_dummies(targets)
+        ###########################
+        # Implementation Footnote #
+        ###########################
+
+        # [Cause]
+        # Multiple feature alignment performed at TTP requires headers 
+        # obtained from OHE-ed features as well as labels. However, based on
+        # the machine learning operation to be executed, labels have to be 
+        # handled differently.
+
+        # [Problems]
+        # Regression predictions are not categorical variables and should 
+        # not be OHE-ed. Classification labels should be OHE-ed, and a 
+        # unique set of headers should always be generated. This includes 
+        # edge-cases like when there is only a single class.
+        # eg. A single class of target 0 VS target 1 VS Regression target
+        #
+        #    target            target_0     <-- Unique header after OHE
+        # 0       0   -->   0         1
+        # 1       0   -->   1         1
+        # 2       0   -->   2         1
+        #
+        #    target            target_1     <-- Unique header after OHE
+        # 0       1   -->   0         1
+        # 1       1   -->   1         1
+        # 2       1   -->   2         1
+        #
+        #    target            target       <-- no change since No OHE
+        # 0     1.0   -->   0     1.0
+        # 1     2.0   -->   1     2.0
+        # 2     3.0   -->   2     3.0
+
+        # [Solution]
+        # Explicitly cast regression targets as floats, while classification
+        # targets as categories.
+
+        if action == 'regress':
+            targets = self.output[['target']].astype(dtype=float)
+        elif action == 'classify':
+            targets = self.output[['target']].astype(dtype='category')
+        else:
+            raise ValueError(f"ML action {action} is not supported!")
+        
+        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}")
 
         if not is_condensed:
-            targets = pd.get_dummies(targets)
+            targets = pd.get_dummies(targets) # no effect on regression values
 
         feat_vals = scaler(features.values) if scaler else features.values
         target_vals = targets.values

@@ -61,7 +61,8 @@ tag_model = ns_api.model(
 poll_input_model = ns_api.model(
     name="poll_input",
     model={
-        "tags": fields.Nested(tag_model, required=True)
+        'action': fields.String(),
+        'tags': fields.Nested(tag_model, required=True)
     }
 )
 
@@ -146,11 +147,13 @@ class Poll(Resource):
         """ Retrieves specified metadata regarding the worker.
 
             JSON received will contain the following information:
-            1) Data tags
+            1) Action (i.e. 'regress', 'classify', 'cluster', 'associate')
+            2) Data tags
 
             eg. 
 
             {
+                "action": 'classify'
                 "tags": {
                     "train": [["type_a","v1"], ["type_b","v2"]],
                     "evaluate": [["type_c","v3"]]
@@ -216,6 +219,7 @@ class Poll(Resource):
 
                     (X_tensor, y_tensor, X_header, y_header, schema, df
                     ) = load_and_combine(
+                        action=request.json['action'],
                         tags=tags, 
                         out_dir=project_cache_dir,
                         is_condensed=False

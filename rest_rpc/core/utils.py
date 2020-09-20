@@ -17,6 +17,9 @@ import pandas as pd
 from flask import jsonify, request
 from flask_restx import fields
 from sklearn.metrics import (
+    r2_score,
+    mean_squared_error,
+    mean_absolute_error,
     accuracy_score, 
     roc_curve,
     roc_auc_score, 
@@ -28,6 +31,7 @@ from sklearn.metrics import (
     confusion_matrix
 )
 from sklearn.metrics.cluster import contingency_matrix
+from sklearn.preprocessing import LabelBinarizer
 from tinydb import TinyDB, Query, where
 from tinydb.middlewares import CachingMiddleware
 from tinydb.storages import JSONStorage
@@ -51,6 +55,8 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 schemas = app.config['SCHEMAS']
 db_path = app.config['DB_PATH']
 payload_template = app.config['PAYLOAD_TEMPLATE']
+
+label_binarizer = LabelBinarizer()
 
 ####################
 # Helper Functions #
@@ -447,8 +453,9 @@ class Benchmarker:
         y_pred: np.ndarray,
         y_score: np.ndarray,
     ) -> Dict[str, List[Union[int, float]]]:
-        """
-
+        """ Given y_true, y_pred & y_score from a classification machine 
+            learning operation, calculate the corresponding summary statistics.
+        
         Args:
             y_true (np.ndarray)
             y_pred (np.ndarray)
@@ -554,9 +561,7 @@ class Benchmarker:
         return rates
 
 
-    def _find_stratified_descriptors(
-        self
-    ) -> Dict[str, List[Union[int, float]]]:
+    def _find_stratified_descriptors(self) -> Dict[str, List[Union[int, float]]]:
         """ Finds the values of descriptors for all classes in a multiclass
             setup. Descriptors are True Negatives (TNs), False Positives (FPs),
             False Negatives (FNs) and True Positives (TPs).
@@ -565,10 +570,7 @@ class Benchmarker:
             Stratified Descriptors (dict(str, list(int)))
         """
         # Calculate confusion matrix
-        cf_matrix = confusion_matrix(
-            np.argmax(self.y_true, axis=1) if self.is_multiclass() else self.y_true,
-            np.argmax(self.y_pred, axis=1) if self.is_multiclass() else self.y_pred
-        )
+        cf_matrix = confusion_matrix(self.y_true, self.y_pred)
         logging.debug(f"Confusion matrix: {cf_matrix}")
 
         FPs = cf_matrix.sum(axis=0) - np.diag(cf_matrix)  
@@ -585,19 +587,20 @@ class Benchmarker:
         return descriptors
 
 
-    def _calculate_stratified_stats(
-        self
-    ) -> Dict[str, List[Union[int, float]]]:
-        """ Calculates descriptive statistics of a training run. Statistics 
-            supported are accuracy, roc_auc_score, pr_auc_score and f_score
+    def _calculate_stratified_stats(self) -> Dict[str, List[Union[int, float]]]:
+        """ Calculates descriptive statistics of a classification run. 
+            Statistics supported are accuracy, roc_auc_score, pr_auc_score and f_score
 
         Returns:
             Stratified Statistics (dict(str, list(float)))
         """
+        ohe_y_true = label_binarizer.fit_transform(self.y_true)
+        ohe_y_pred = label_binarizer.fit_transform(self.y_pred)
+
         aggregated_statistics = {}
         for col_true, col_pred, col_score in zip(
-            self.y_true.T, 
-            self.y_pred.T, 
+            ohe_y_true.T, 
+            ohe_y_pred.T, 
             self.y_score.T
         ):
             label_statistics = self._calculate_summary_stats(
@@ -611,6 +614,59 @@ class Benchmarker:
                 aggregated_statistics[metric] = metric_collection
 
         return aggregated_statistics
+
+
+    def _analyse_regression(self) -> Dict[str, float]:
+        """ Automates calculation of descriptive statistics, assuming that 
+            y_true, y_pred & y_scores all correspond to a regression machine
+            learning operation.
+                  
+            Statistics supported for regression include:
+            1) R2   : R-squared
+            2) MSE  : Mean Squared Error
+            3) MAE  : Mean Absolute Error
+
+        Returns:
+            Regression statistics (dict)
+        """
+        R2 = r2_score(self.y_true, self.y_pred)
+        MSE = mean_squared_error(self.y_true, self.y_pred)
+        MAE = mean_absolute_error(self.y_true, self.y_pred)
+        return {'R2': R2, 'MSE': MSE, 'MAE': MAE}
+
+
+    def _analyse_classification(self) -> Dict[str, List[Union[int, float]]]:
+        """ Automates calculation of descriptive statistics, assuming that 
+            y_true, y_pred & y_scores all correspond to a classification
+            machine learning operation.
+
+            Statistics supported for classification include:
+            1) accuracy
+            2) roc_auc_score
+            3) pr_auc_score
+            4) f_score
+            5) TPRs
+            6) TNRs
+            7) PPVs
+            8) NPVs
+            9) FPRs
+            10) FNRs
+            11) FDRs
+            12) TPs
+            13) TNs
+            14) FPs
+            15) FNs
+
+        Returns:
+            Classification statistics (dict)
+        """
+        statistics = self._calculate_stratified_stats()
+        descriptors = self._find_stratified_descriptors()
+        rates = self._calculate_descriptive_rates(**descriptors)
+        statistics.update(descriptors)
+        statistics.update(rates)
+
+        return statistics
 
 
     def decode_ohe_dataset(self, dataset, header, alignment):
@@ -638,40 +694,29 @@ class Benchmarker:
         raise NotImplementedError
 
 
-    def analyse(self):
+    def analyse(self, action: str) -> dict:
         """ Automates calculation of descriptive statistics over restored 
             batched data. 
             
-            Statistics supported include:
-            1) accuracy,
-            2) roc_auc_score
-            3) pr_auc_score
-            4) f_score
-            5) TPRs
-            6) TNRs
-            7) PPVs
-            8) NPVs
-            9) FPRs
-            10) FNRs
-            11) FDRs
-            12) TPs
-            13) TNs
-            14) FPs
-            15) FNs
-
+        Args:
+            action (str): Type of ML operation to be executed. Supported options
+                are as follows:
+                1) 'regress': Orchestrates FL grid to perform regression
+                2) 'classify': Orchestrates FL grid to perform classification
+                3) 'cluster': TBA
+                4) 'associate': TBA
         Returns:
             Statistics (dict)
         """
-        statistics = self._calculate_stratified_stats()
+        if action == "regress":
+            return self._analyse_regression()
 
-        descriptors = self._find_stratified_descriptors()
-        rates = self._calculate_descriptive_rates(**descriptors)
-        statistics.update(descriptors)
-        statistics.update(rates)
+        elif action == "classify":
+            return self._analyse_classification()
 
-        return statistics
+        else:
+            raise ValueError(f"ML action {action} is not supported!")
         
-
 
     def export(self, out_dir):
         """ Exports reconstructed dataset to file for client's perusal
