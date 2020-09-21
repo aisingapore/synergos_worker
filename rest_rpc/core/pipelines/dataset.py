@@ -118,9 +118,9 @@ class ComplexSingleton(Singleton):
         """
         dataset = super().data
         for col in dataset.columns:
-            logging.debug(f'Image Column: {dataset[col]}')
             try:
-                dataset[col] = dataset[col].apply(tuple)
+                if col != 'target':
+                    dataset[col] = dataset[col].apply(tuple)
             except TypeError:
                 # Skip any non-iterable elements
                 pass
