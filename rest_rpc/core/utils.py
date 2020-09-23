@@ -14,6 +14,7 @@ from typing import Dict, List, Tuple, Union
 import jsonschema
 import numpy as np
 import pandas as pd
+import torch as th
 from flask import jsonify, request
 from flask_restx import fields
 from sklearn.metrics import (
@@ -435,11 +436,7 @@ class Benchmarker:
             False   otherwise
         """
         try:
-            return (
-                self.y_true.shape[1] > 1 and 
-                self.y_pred.shape[1] > 1 and  
-                self.y_score.shape[1] > 1
-            )
+            return self.y_score.shape[1] > 1
         except IndexError:
             return False
 
@@ -589,13 +586,13 @@ class Benchmarker:
 
     def _calculate_stratified_stats(self) -> Dict[str, List[Union[int, float]]]:
         """ Calculates descriptive statistics of a classification run. 
-            Statistics supported are accuracy, roc_auc_score, pr_auc_score and f_score
+            Statistics supported are accuracy, roc_auc_score, pr_auc_score and
+            f_score
 
         Returns:
             Stratified Statistics (dict(str, list(float)))
         """
-        ohe_y_true = label_binarizer.fit_transform(self.y_true)
-        ohe_y_pred = label_binarizer.fit_transform(self.y_pred)
+        ohe_y_true, ohe_y_pred = self._decode_ohe_dataset()
 
         aggregated_statistics = {}
         for col_true, col_pred, col_score in zip(
@@ -669,10 +666,23 @@ class Benchmarker:
         return statistics
 
 
-    def decode_ohe_dataset(self, dataset, header, alignment):
-        """ Reverses one-hot encoding applied on a dataset
+    def _decode_ohe_dataset(self):
+        """ Reverses one-hot encoding applied on a dataset, while maintaining 
+            the original 
         """
-        raise NotImplementedError
+        if self.is_multiclass():
+            ohe_y_true = th.nn.functional.one_hot(
+                th.as_tensor(self.y_true),
+                num_classes=self.y_score.shape[-1]
+            ).numpy()
+            ohe_y_pred = th.nn.functional.one_hot(
+                th.as_tensor(self.y_pred),
+                num_classes=self.y_score.shape[-1]
+            ).numpy()
+            return ohe_y_true, ohe_y_pred
+
+        else:
+            return self.y_true, self.y_pred
 
 
     def reconstruct_dataset(self):

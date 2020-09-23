@@ -679,7 +679,7 @@ class Preprocessor(BasePipe):
 
         if action == 'regress':
             # No need for OHE or argmax
-            y_tensor = th.Tensor(y).float()
+            y_tensor = th.Tensor(y).float() # not affected by OHE
 
         elif action == 'classify':
             if y.shape[1] < 2:
