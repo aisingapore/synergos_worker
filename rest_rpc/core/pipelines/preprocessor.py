@@ -682,13 +682,22 @@ class Preprocessor(BasePipe):
             y_tensor = th.Tensor(y).float() # not affected by OHE
 
         elif action == 'classify':
-            if y.shape[1] < 2:
-                raise RuntimeError('At least 2 classes MUST be specified!') 
+            # When at least 2 class labels exists, condense via argmax if needed 
+            formatted_y = (
+                np.argmax(y, axis=1) 
+                if is_condensed and y.shape[1] >= 2 
+                else y
+            )
+            # Final shape of tensor is determined by the type of classification
+            # performed. If binary classification, labels MUST exist as (N, 1).
+            # However, for multiclass classification, labels MUST exists as (N,) 
+            if y.shape[1] <= 2: 
+                # Case 1: Binary classification
+                y_tensor = th.Tensor(formatted_y).reshape(shape=(-1, 1)).long()
+            else:
+                # Case 2: Multiclass classification
+                y_tensor = th.Tensor(formatted_y).long()
 
-            # Now condense labels into an appropriate form post-alignment
-            y = np.argmax(y, axis=1) if is_condensed else y
-            y_tensor = th.Tensor(y).long()
-        
         else:
             raise ValueError(f"ML action {action} is not supported!")
 

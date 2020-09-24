@@ -592,13 +592,13 @@ class Benchmarker:
         Returns:
             Stratified Statistics (dict(str, list(float)))
         """
-        ohe_y_true, ohe_y_pred = self._decode_ohe_dataset()
+        ohe_y_true, ohe_y_pred, ohe_y_score= self._decode_ohe_dataset()
 
         aggregated_statistics = {}
         for col_true, col_pred, col_score in zip(
             ohe_y_true.T, 
             ohe_y_pred.T, 
-            self.y_score.T
+            ohe_y_score.T
         ):
             label_statistics = self._calculate_summary_stats(
                 y_true=col_true, 
@@ -668,7 +668,8 @@ class Benchmarker:
 
     def _decode_ohe_dataset(self):
         """ Reverses one-hot encoding applied on a dataset, while maintaining 
-            the original 
+            the original class representations
+            Assumption: This function can only be used if action is to classify
         """
         if self.is_multiclass():
             ohe_y_true = th.nn.functional.one_hot(
@@ -679,11 +680,17 @@ class Benchmarker:
                 th.as_tensor(self.y_pred),
                 num_classes=self.y_score.shape[-1]
             ).numpy()
-            return ohe_y_true, ohe_y_pred
+            ohe_y_score = self.y_score
 
         else:
-            return self.y_true, self.y_pred
+            ohe_y_true = np.concatenate((1-self.y_true, self.y_true), axis=1)
+            ohe_y_pred = np.concatenate((1-self.y_pred, self.y_pred), axis=1)
+            ohe_y_score = np.concatenate((1-self.y_score, self.y_score), axis=1)
 
+        logging.debug(f"OHE y_true: {ohe_y_true}")
+        logging.debug(f"OHE y_pred: {ohe_y_pred}")
+        logging.debug(f"OHE y_score: {ohe_y_score}")
+        return ohe_y_true, ohe_y_pred, ohe_y_score
 
     def reconstruct_dataset(self):
         """ Searches WebsocketServerWorker for dataset objects and their
