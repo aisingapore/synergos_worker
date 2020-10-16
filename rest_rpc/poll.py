@@ -192,13 +192,27 @@ class Poll(Resource):
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
 
+        # Polling initialises the project logs if it does not exist yet
+        if not retrieved_metadata:
+            meta_records.create(
+                project_id=project_id, 
+                details={
+                    'tags': {},
+                    'headers': {},
+                    'schemas': {},
+                    'exports': {},
+                    'is_live': False,
+                    'in_progress': [],
+                    'connections': [],
+                    'results': {}
+                }
+            )
+            retrieved_metadata = meta_records.read(project_id)
+
         # If polling operation had already been done before, skip preprocessing
         # (Note: this is only valid if the submitted set of tags are the same)
-        if (retrieved_metadata and 
-            retrieved_metadata['tags'] == request.json['tags']):
-            data = retrieved_metadata
-
-            # Retrieve aligned data from cache
+        if retrieved_metadata['tags'] == request.json['tags']:
+            data = retrieved_metadata   # retrieve aligned data from cache
 
         # Otherwise, perform preprocessing and archive results of operation
         else:
@@ -252,19 +266,16 @@ class Poll(Resource):
                     logging.debug(f"Exports: {exports}")
 
 
-            data = meta_records.create(
+            meta_records.update(
                 project_id=project_id, 
-                details={
+                updates={
                     'tags': request.json['tags'],
                     'headers': headers,
                     'schemas': schemas,
-                    'exports': exports,
-                    'is_live': False,
-                    'in_progress': [],
-                    'connections': [],
-                    'results': {}
+                    'exports': exports
                 }
             )
+            data = meta_records.read(project_id)
 
             # except KeyError:
             #     ns_api.abort(                

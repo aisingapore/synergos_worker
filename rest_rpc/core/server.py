@@ -10,6 +10,8 @@ import asyncio
 import json
 import logging
 import os
+import shlex
+import subprocess
 from glob import glob
 from multiprocessing import Event, Process
 from pathlib import Path
@@ -45,6 +47,7 @@ device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 hook = sy.TorchHook(th, verbose=False) # toggle where necessary
 hook.local_worker.is_client_worker = False
 
+src_dir = app.config['SRC_DIR']
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
 
@@ -400,6 +403,36 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
             server (WebsocketServerWorker): WS worker representing participant
         """
         server.start()
+
+    # def alternative_target(server):
+    #     """ Initialises Data centric server to listen to specified port for
+    #         incoming connections
+
+    #     Args:
+    #         server (WebsocketServerWorker): WS worker representing participant
+    #     """
+    #     driver_script_path = os.path.join(
+    #         src_dir, "rest_rpc", "core", "node", "run.sh"
+    #     )
+    #     command = "{} --id {} --host {} --port {} --start_local_db".format(
+    #         driver_script_path,
+    #         kwargs['id'],
+    #         kwargs['host'],
+    #         kwargs['port']
+    #     )
+    #     try:
+    #         worker_process = subprocess.run(
+    #             shlex.split(command),
+    #             check=True, 
+    #             stdout=subprocess.PIPE, 
+    #             stderr=subprocess.PIPE,
+    #             text=True
+    #         )
+    #         return worker_process
+
+    #     except subprocess.CalledProcessError as cpe:
+    #         logging.error(f"CustomWebsocketWorker: Something went wrong during tuning initialisation! {cpe}")
+    #         raise Exception
         
     action = kwargs.pop('action')
     all_tags = kwargs.pop('tags')

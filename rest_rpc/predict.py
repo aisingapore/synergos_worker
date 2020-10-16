@@ -252,7 +252,7 @@ class Prediction(Resource):
             try:
                 action = request.json['action']
 
-                results = {}
+                results = {} # only accumulate for metas that have changed
                 for meta, inference in request.json['inferences'].items():
 
                     if inference:
@@ -311,7 +311,10 @@ class Prediction(Resource):
 
                 # Update relevant `results` entries 
                 # Note: This will overwrite previous predictions
-                retrieved_metadata['results'][expt_run_key] = results 
+                archived_results = retrieved_metadata['results'].get(expt_run_key, {})
+                archived_results.update(results)
+                retrieved_metadata['results'][expt_run_key] = archived_results 
+
                 updated_metadata = meta_records.update(
                     project_id=project_id, 
                     updates=retrieved_metadata
