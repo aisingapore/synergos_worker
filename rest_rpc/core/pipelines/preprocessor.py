@@ -693,7 +693,7 @@ class Preprocessor(BasePipe):
             # However, for multiclass classification, labels MUST exists as (N,) 
             if y.shape[1] <= 2: 
                 # Case 1: Binary classification
-                y_tensor = th.Tensor(formatted_y).reshape(shape=(-1, 1)).long()
+                y_tensor = th.Tensor(formatted_y).reshape(shape=(-1, 1)).float()
             else:
                 # Case 2: Multiclass classification
                 y_tensor = th.Tensor(formatted_y).long()
