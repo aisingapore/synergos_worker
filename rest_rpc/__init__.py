@@ -20,10 +20,10 @@ app = Flask(__name__)
 app.config.from_object('config')
 
 blueprint = Blueprint("PySyft WSSW Controller", __name__)
-
+api_version = app.config['API_VERSION']
 api = Api(
     app=blueprint,
-    version="0.0.1",
+    version=api_version,
     title="PySyft Worker REST-RPC Controller API", 
     description="Controller API to facilitate model training in a PySyft grid"
 )
