@@ -74,6 +74,9 @@ RUN pip install --upgrade pip setuptools wheel \
 ADD . /worker
 WORKDIR /worker
 
+RUN pip install -r synergos_logger/requirements.txt
+RUN pip install synergos_logger/
+
 EXPOSE 5000
 EXPOSE 8020
 

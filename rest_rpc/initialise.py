@@ -22,11 +22,22 @@ from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.poll import tag_model, schema_model
 from rest_rpc.align import alignment_model
 
+
+from SynergosLogger.SynergosLogger import SynergosLogger
+from SynergosLogger import config
+import os
+CONST_TTP = config.TTP
+# Initializing SynergosLogger with the graylog server and port
+file_path = os.path.dirname(os.path.abspath(__file__)) # The file path of where the logger is being called
+syn_logger = SynergosLogger(server=CONST_TTP['SERVER'], port=CONST_TTP['PORT'], logging_level=logging.DEBUG, debugging_fields=True, file_path=file_path, logger_name=CONST_TTP['LOGGER'])
+# If there are logs to be censored, pass in optional argument "censor_keys" to censor log messages else empty [].
+logging, logger = syn_logger.initialize_structlog()
+logging.info("testing worker node", something="somethingx")
+
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "initialise", 

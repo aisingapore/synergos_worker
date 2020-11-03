@@ -37,7 +37,7 @@ from rest_rpc.core.custom import CustomServerWorker
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
+# logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 # Avoid Pytorch deadlock issues
 th.set_num_threads(1)
