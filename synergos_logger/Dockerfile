@@ -23,7 +23,7 @@ WORKDIR /graylog
 COPY SynergosLogger SynergosLogger
 COPY setup.py setup.py
 COPY requirements.txt requirements.txt
-COPY psutil psutil
+COPY HardwareStatsLogger HardwareStatsLogger
 COPY README.md README.md
 
 RUN pip3 install -r requirements.txt
