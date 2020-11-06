@@ -1,0 +1,77 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Headers of data from different meta types (Payload)",
+    "description": "OHE column names of datasets specified by participant",
+    "type": "object",
+    "definitions": {
+
+        "headers": {
+            "type": "object",
+            "train": {
+                "description": "Headers of specified training data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            },
+    
+            "evaluate": {
+                "description": "Headers of specified evaluation data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            },
+    
+            "predict": {
+                "description": "Headers of specifed prediction data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        }
+    },
+
+    "properties": {
+        
+        "train": {"$ref": "#/definitions/headers/train"},
+        "evaluate": {"$ref": "#/definitions/headers/evaluate"},
+        "predict": {"$ref": "#/definitions/headers/predict"}
+    },
+
+    "required": ["train"]   
+}

@@ -1,0 +1,54 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Data schemas of aggregated + interpolated datasets triggered by TTP (Payload)",
+    "description": "Schemas for different metatypes for handling local datasets",
+    "type": "object",
+    "definitions": {
+
+        "schemas": {
+            "type": "object",
+            "train": {
+                "description": "Schema of aggregated + interpolated training datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            },
+    
+            "evaluate": {
+                "description": "Schema of aggregated + interpolated evaluation datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            },
+    
+            "predict": {
+                "description": "Schema of aggregated + interpolated prediction datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            }
+        }
+    },
+
+    "properties": {
+        
+        "train": {"$ref": "#/definitions/schemas/train"},
+        "evaluate": {"$ref": "#/definitions/schemas/evaluate"},
+        "predict": {"$ref": "#/definitions/schemas/predict"}
+        
+    },
+
+    "required": ["train"]
+}

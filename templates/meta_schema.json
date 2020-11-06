@@ -1,0 +1,368 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Archival logs for worker operations",
+    "description": "OHE column names of datasets specified by participant",
+    "type": "object",
+    "definitions": {
+
+        "tags": {
+            "type": "object",
+            "train": {
+                "description": "Training tag(s)",
+                "type": "array",
+                "items": {
+                    "description": "Tag as a list of path tokens",
+                    "type": "array",
+                    "items": {
+                        "description": "Path token",
+                        "type": "string"
+                    }
+                }
+            },
+    
+            "evaluate": {
+                "description": "Evaluation tag(s)",
+                "type": "array",
+                "items": {
+                    "description": "Tag as a list of path tokens",
+                    "type": "array",
+                    "items": {
+                        "description": "Path token",
+                        "type": "string"
+                    }
+                }
+            },
+    
+            "predict": {
+                "description": "Prediction tag(s)",
+                "type": "array",
+                "items": {
+                    "description": "Tag as a list of path tokens",
+                    "type": "array",
+                    "items": {
+                        "description": "Path token",
+                        "type": "string"
+                    }
+                }
+            },
+    
+            "model": {
+                "description": "Custom tag to optimal local model",
+                "type": "array",
+                "items": {
+                    "description": "Tag as a list of path tokens",
+                    "type": "string"
+                }
+            },
+    
+            "hyperparameters": {
+                "description": "Custom tag to local hyperparameter set for optimality",
+                "type": "array",
+                "items": {
+                    "description": "Tag as a list of path tokens",
+                    "type": "string"
+                }
+            }
+        },
+
+        "headers":  {
+            "type": "object",
+            "train": {
+                "description": "Headers of specified training data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            },
+    
+            "evaluate": {
+                "description": "Headers of specified evaluation data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            },
+    
+            "predict": {
+                "description": "Headers of specifed prediction data",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Header sequence from OHE features",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    },
+    
+                    "y": {
+                        "description": "Header sequence from OHE labels",
+                        "type": "array",
+                        "items": {"type": "string"}
+                    }
+                }
+            }
+        },
+
+        "schemas": {
+            "type": "object",
+            "train": {
+                "description": "Schema of aggregated + interpolated training datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            },
+    
+            "evaluate": {
+                "description": "Schema of aggregated + interpolated evaluation datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            },
+    
+            "predict": {
+                "description": "Schema of aggregated + interpolated prediction datasets",
+                "type": "object",
+                "patternProperties": {
+    
+                    "^.*$": {"type": "string"}
+                },
+    
+                "additionalProperties": false
+            }
+        },
+
+        "exports": {
+            "description": "Paths to all exported tensors",
+            "type": "object",
+            "train": {
+                "description": "Paths to exported aggregated + interpolated training datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
+                }
+            },
+    
+            "evaluate": {
+                "description": "Paths to exported aggregated + interpolated evaluation datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
+                }
+            },
+    
+            "predict": {
+                "description": "Paths to exported aggregated + interpolated prediction datasets",
+                "type": "object",
+                "properties":{
+                    "X": {"type": "string"},
+                    "y": {"type": "string"},
+                    "dataframe": {"type": "string"},
+                    "predictions": {"type": "string"},
+                    "scores": {"type": "string"}
+                }
+            }
+        },
+
+        "alignments": {
+            "description": "Aligned headers after multiple feature alignment",
+            "type": "object",
+            "train": {
+                "description": "Aligned headers for combined training dataset",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Spacer indexes for aligning features",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    },
+    
+                    "y": {
+                        "description": "Spacer indexes for aligning targets",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    }
+                },
+    
+                "required": ["X", "y"]
+            },
+    
+            "evaluate": {
+                "description": "Aligned headers for combined evaluation dataset",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Spacer indexes for aligning features",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    },
+    
+                    "y": {
+                        "description": "Spacer indexes for aligning targets",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    }
+                },
+    
+                "required": ["X", "y"]
+            },
+    
+            "predict": {
+                "description": "Aligned headers for combined prediction dataset",
+                "type": "object",
+                "properties": {
+    
+                    "X": {
+                        "description": "Spacer indexes for aligning features",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    },
+    
+                    "y": {
+                        "description": "Spacer indexes for aligning targets",
+                        "type": "array",
+                        "items": {
+                            "description": "Spacer index",
+                            "type": "integer"
+                        }
+                    }
+                },
+    
+                "required": ["X", "y"]
+            }            
+        },
+
+        "statistics": {
+            "description": "Statistical results of an experiment-run",
+            "type": "object",
+            "properties": {
+                "accuracy": {"type": ["array", "number"]},
+                "roc_auc_score": {"type": ["array", "number"]},
+                "pr_auc_score": {"type": ["array", "number"]},
+                "f_score": {"type": ["array", "number"]},
+                "TPRs": {"type": ["array", "integer"]},
+                "TNRs": {"type": ["array", "integer"]},
+                "PPVs": {"type": ["array", "integer"]},
+                "NPVs": {"type": ["array", "integer"]},
+                "FPRs": {"type": ["array", "integer"]},
+                "FNRs": {"type": ["array", "integer"]},
+                "FDRs": {"type": ["array", "integer"]},
+                "TPs": {"type": ["array", "integer"]},
+                "TNs": {"type": ["array", "integer"]},
+                "FPs": {"type": ["array", "integer"]},
+                "FNs": {"type": ["array", "integer"]}
+            }
+        }
+    },
+    "properties": {
+
+        "tags"      : {"$ref": "#/definitions/tags"},
+        "headers"   : {"$ref": "#/definitions/headers"},
+        "schemas"   : {"$ref": "#/definitions/schemas"},
+        "exports"   : {"$ref": "#/definitions/exports"},
+        "alignments": {"$ref": "#/definitions/alignments"},
+
+        "is_live": {
+            "description": "Boolean switching tracking state of project",
+            "type": "boolean"
+        },
+
+        "in_progress": {
+            "description": "Tracks experiment-runs remaining",
+            "type": "array",
+            "items": {"type": "string"}
+        },
+
+        "connections": {
+            "description": "Concurrent experiment-runs found under project",
+            "type": "array",
+            "items": {"type": "string"}
+        },
+
+        "results": {
+            "description": "Results for concurrent experiment-runs found under project",
+            "type": "object",
+            "patternProperties": {
+                "\\((.*?,.*?)\\)": {
+                    "train": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to training results",
+                            "type": "string"
+                        }
+                    },
+                    "evaluate": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to evaluation results",
+                            "type": "string"
+                        }
+                    },
+                    "predict": {
+                        "statistics": {"$ref": "#/definitions/statistics"},
+                        "res_path": {
+                            "description": "Path to prediction results",
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+
+    "required": ["tags", "headers", "schemas", "exports"]
+}
