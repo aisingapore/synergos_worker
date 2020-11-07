@@ -34,11 +34,13 @@ from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 # Configure symspell for spelling correction
 symspell_dictionaries = app.config['SYMSPELL_DICTIONARIES']
@@ -64,6 +66,8 @@ for ssp_bigram_path in symspell_bigrams:
 cores_used = app.config['CORES_USED']
 
 SEED = 42
+
+logging.info(f"textpipe.py logged")
 
 #################### 
 # Helper functions #
@@ -601,6 +605,6 @@ class TextPipe(BasePipe):
 
             self.output = self.create_docterm_matrix(unified_corpus)
 
-        logging.debug(f"Doc-term matrix: {self.output.data}")
+        #logging.notset(f"Doc-term matrix: {self.output.data}", Class=TextPipe.__name__, function=TextPipe.run.__name__)
 
         return self.output

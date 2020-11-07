@@ -57,3 +57,4 @@ Running TTP
 > docker run -p 0.0.0.0:5000:5000 -p 5678:5678 -p 8020:8020 -p 8080:8080 -v /Users/kelvinsoh/Desktop/Synergos/abalone/ttp_data:/ttp/data -vUsers/kelvinsoh/desktop/Synergos/mlflow_test:/ttp/mlflow --name ttp --link worker_1 --link worker_2 --link graylog --net synergos_logger_default ttp:pysyft_demo
 
 The log should be reflected in localhost:9000
+

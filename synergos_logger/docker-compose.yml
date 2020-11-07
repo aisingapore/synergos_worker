@@ -56,6 +56,6 @@ services:
       # Syslog UDP
       - 1514:1514/udp
       # GELF TCP port for TTP, Worker_1 and Worker_2
-      - "12201-12205:12201-12205"
+      - "12201-12220:12201-12220"
       # GELF UDP
       - 12201:12201/udp

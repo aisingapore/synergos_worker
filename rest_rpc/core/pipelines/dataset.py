@@ -18,12 +18,14 @@ from typing import Dict, List, Union
 import numpy as np
 import pandas as pd
 
-# Custom
-
+# Synergos logging
+from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
 ##################
+
+logging.info(f"dataset.py logged")
 
 ######################################
 # Data Abstraction Class - Singleton #
@@ -122,6 +124,7 @@ class ComplexSingleton(Singleton):
                 if col != 'target':
                     dataset[col] = dataset[col].apply(tuple)
             except TypeError:
+                logging.warning("Non-tuple when tried to be casted into tuple throws error", Class=ComplexSingleton.__name__, function=ComplexSingleton.data.__name__)
                 # Skip any non-iterable elements
                 pass
 
@@ -295,7 +298,7 @@ class PipeData:
             Combined dataset (pd.DataFrame)
         """
         df_list = self.__load_data(singletons)
-        logging.debug(f"DF List: {df_list}")
+        logging.debug(f"DF List: {df_list}", Class=PipeData.__name__, function=PipeData.__combine_data.__name__)
 
         return pd.concat(
             df_list, 

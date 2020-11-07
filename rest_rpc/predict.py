@@ -25,11 +25,12 @@ from rest_rpc.core.utils import (
 from rest_rpc.initialise import cache
 from rest_rpc.align import alignment_model
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "predict", 
@@ -46,6 +47,8 @@ outdir_template = predict_template['out_dir']
 y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
+
+logging.info(f"predict.py logged", Description="Changes made")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -246,8 +249,8 @@ class Prediction(Resource):
             # in cache for retrieval/operation
             wss_worker = cache[project_id]['participant']
 
-            logging.debug(f"Objects in WSSW: {wss_worker._objects}")
-            logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}")
+            logging.debug(f"Objects in WSSW: {wss_worker._objects}", Class=Prediction.__name__, function=Prediction.post.__name__)
+            logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}", Class=Prediction.__name__, function=Prediction.post.__name__)
 
             try:
                 action = request.json['action']
@@ -257,7 +260,7 @@ class Prediction(Resource):
 
                     if inference:
 
-                        logging.debug(f"Inference: {inference}")
+                        #logging.notset(f"Inference: {inference}", Class=Prediction.__name__, function=Prediction.post.__name__)
 
                         sub_keys = {
                             'project_id': project_id, 
@@ -277,8 +280,8 @@ class Prediction(Resource):
                         # Retrieved aligned y_true labels
                         labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
 
-                        logging.debug(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}")
-                        logging.debug(f"Labels: {labels}, {type(labels)}, {labels.shape}")
+                        #logging.notset(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}", Class=Prediction.__name__, function=Prediction.post.__name__)
+                        #logging.notset(f"Labels: {labels}, {type(labels)}, {labels.shape}", Class=Prediction.__name__, function=Prediction.post.__name__)
 
                         # Calculate inference statistics
                         benchmarker = Benchmarker(labels, y_pred, y_score)
@@ -320,7 +323,7 @@ class Prediction(Resource):
                     updates=retrieved_metadata
                 )
                 
-                logging.debug(f"Updated Metadata: {updated_metadata}")
+                logging.debug(f"Updated Metadata: {updated_metadata}", Class=Prediction.__name__, function=Prediction.post.__name__)
 
                 success_payload = payload_formatter.construct_success_payload(
                     status=200,
@@ -328,15 +331,19 @@ class Prediction(Resource):
                     params=request.view_args,
                     data=updated_metadata
                 )
+                logging.info(f"Successful payload", code="200", Class=Prediction.__name__, function=Prediction.post.__name__)
                 return success_payload, 200
 
             except KeyError:
+                logging.error(f"Project not initialised", code="417", description="Insufficient info specified for metadata tracing!", Class=Prediction.__name__, function=Prediction.post.__name__)
                 ns_api.abort(                
                     code=417,
                     message="Insufficient info specified for metadata tracing!"
                 )
 
         else:
+            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Prediction.__name__, function=Prediction.post.__name__)
+
             ns_api.abort(
                 code=404, 
                 message=f"Project logs '{project_id}' has not been initialised! Please initialise and try again."

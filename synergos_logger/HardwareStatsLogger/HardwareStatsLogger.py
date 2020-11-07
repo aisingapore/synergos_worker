@@ -10,7 +10,7 @@ import json
 import os
 
 from SynergosLogger.SynergosLogger import SynergosLogger
-from SynergosLogger import config
+from SynergosLogger import syn_logger_config as config
 
 class CPU_Filter(logging.Filter):
     def __init__(self):
@@ -74,7 +74,7 @@ loop = asyncio.get_event_loop()
 RESOLUTION = 1. # How often to probe for hardware usage in seconds
 
 # initializing TTP container information such as "Server", "Port" and "Logger name"
-CONST_TTP = config.SYSMETRICS
+CONST_SYSMETRICS = config.SYSMETRICS
 
 # Initializing SynergosLogger with the graylog server and port
 # file_path = os.path.dirname(os.path.abspath(__file__) + '/' + __file__)
@@ -82,7 +82,7 @@ file_path = sys.argv[1]
 class_name = sys.argv[2]
 function_name = sys.argv[3]
 
-syn_logger = SynergosLogger(server=CONST_TTP['SERVER'], port=CONST_TTP['PORT'], logging_level=logging.DEBUG, file_path=file_path, logger_name=CONST_TTP['LOGGER'], filter_function=[CPU_Filter(), Memory_Filter(), DiskIO_Filter(), NetIO_Filter()])
+syn_logger = SynergosLogger(server=CONST_SYSMETRICS['SERVER'], port=CONST_SYSMETRICS['PORT'], logging_level=logging.DEBUG, file_path=file_path, logger_name=CONST_SYSMETRICS['LOGGER'], filter_function=[CPU_Filter(), Memory_Filter(), DiskIO_Filter(), NetIO_Filter()])
 # If there are logs to be censored, pass in optional argument "censor_keys" to censor log messages.
 logging, logger = syn_logger.initialize_structlog()
 

@@ -54,7 +54,7 @@ class StructlogUtils:
 
 class SynergosLogger:
     
-    def __init__(self, server, port, logging_level, debugging_fields=False, file_path="", logger_name="std_log", filter_function=[]):
+    def __init__(self, server, port, logging_level, debugging_fields=False, file_path="", logger_name="std_log", filter_function=[], logging_variant='graylog'):
         """
         Initialize configuration for setting up a logging server using structlog
         args:
@@ -63,6 +63,7 @@ class SynergosLogger:
             port: The port of the logging server e.g. 9000 for graylog
             logging_level: logging.DEBUG, logging.INFO, logging.WARNING etc..
             logger_name: Identifying different logger by name e.g. TTP, worker_1, worker_2
+            logging_variant: The type of logging to use e.g. SME = basic logging, Cluster = logging to graylog server
         """
         self.file_path = file_path
         self.server = server
@@ -71,6 +72,7 @@ class SynergosLogger:
         self.debugging_fields = debugging_fields
         self.logger_name = logger_name
         self.filter_function = filter_function
+        self.logging_variant = logging_variant
 
     
     def add_filter_function(self, logger, filter_function):
@@ -95,6 +97,7 @@ class SynergosLogger:
         get_file_path = structlogUtils.get_file_path
         add_timestamp = structlogUtils.add_timestamp
         graypy_structlog_processor = structlogUtils.graypy_structlog_processor
+        logging_variant = graypy_structlog_processor if self.logging_variant == 'graylog' else structlog.processors.JSONRenderer(indent=1)
 
         structlog.configure(
             processors=[
@@ -110,7 +113,8 @@ class SynergosLogger:
                 structlog.processors.StackInfoRenderer(), 
                 structlog.processors.format_exc_info,
                 structlog.processors.UnicodeDecoder(),
-                graypy_structlog_processor,
+                logging_variant,
+                # graypy_structlog_processor,
                 # structlog.stdlib.render_to_log_kwargs,
                 # structlog.processors.JSONRenderer(indent=1), # for dictionary in message
             ],
@@ -135,12 +139,14 @@ class SynergosLogger:
         logger = logging.getLogger(self.logger_name) # logger name must tally for basic logging and structlog
         # logger.setLevel('INFO')
         # handler = graypy.GELFTCPHandler(host=self.server, port=self.port, include_extra_fields=True, _file_path=self.file_path, **kwargs)
-        handler = graypy.GELFTCPHandler(host=self.server, port=self.port,
-             debugging_fields=self.debugging_fields, facility="", level_names=True) # disable default debugging fields "function", "pid", "process_name", "thread_name"
 
-        if len(self.filter_function) > 0:
-            self.add_filter_function(logger, self.filter_function)    
-        logger.addHandler(handler)
+        if self.logging_variant == 'graylog': # switch case if 
+            handler = graypy.GELFTCPHandler(host=self.server, port=self.port,
+                debugging_fields=self.debugging_fields, facility="", level_names=True) # disable default debugging fields "function", "pid", "process_name", "thread_name"
+
+            if len(self.filter_function) > 0:
+                self.add_filter_function(logger, self.filter_function)
+            logger.addHandler(handler)
 
         syn_logger = structlog.get_logger(self.logger_name)
         return syn_logger, logger
