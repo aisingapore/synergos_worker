@@ -379,7 +379,8 @@ class MetaRecords(Records):
         return {"project_id": project_id}
 
     def create(self, project_id, details):
-        # Check that new details specified conforms to export schema
+        # Check that new details specified conforms to export schema 
+        # json describing schema is located in synergos_worker/templates/meta_schema.json
         jsonschema.validate(details, schemas["meta_schema"])
         meta_key = self.__generate_key(project_id)
         new_metadata = {'key': meta_key}
@@ -739,3 +740,97 @@ class Benchmarker:
         """ Exports reconstructed dataset to file for client's perusal
         """
         raise NotImplementedError
+
+####################################
+# MetaExtractor Class - MetaExtractor #
+####################################
+
+class MetaExtractor:
+    """ does the extraction
+
+    Attributes:
+        y_true (np.ndarray): Truth labels loaded into WSSW
+        y_pred (np.ndarray): Predictions obtained from TTP, casted into classes
+        y_score (np.ndarray): Raw scores/probabilities obtained from TTP
+    """
+    def __init__(
+        self, 
+        y_true: np.ndarray, 
+        y_pred: np.ndarray, 
+        y_score: np.ndarray
+    ):
+        self.y_true = y_true
+        self.y_pred = y_pred
+        self.y_score = y_score # > dont need?
+
+        self.table_metadata = {} # must update and sync with meta_schema.json table_metadata  
+        # also known as catalogue.json 
+        #   in future: maybe should instantiate as a Records class and populate? 
+
+
+    def extract_metadata(data_type, project_id, participant_id, tags, collab_name=None):
+
+        # Caching
+        if catalogue.json already exists:
+            load catalogue.json into self.table_metadata
+
+        # d c s t is 
+        # d is collab_name
+        # c is project_id
+        # s is participant id
+        # t is tags i.e. train/2020/blahblah (full path to dataset)
+
+        collab_name = "SOME COLLAB NAME" # could be root directory of data tags
+        #populate project_id
+        #populate tags
+        
+
+        # Logic switch for data_type
+        if is_tabular:
+            get_min
+            get_max
+        else is_image:
+            get_rgb
+        else is_text:
+            ???
+        
+        self.metadata = 
+
+
+
+
+        #populate the data structure
+    def export_metadata():
+        '''
+        Save the "catalogue.json" or whatever new file name we decide, to worker's container probably in /data
+        '''
+        #save_to_file(self.metadata)
+        # json.loads(metadata) ("get a .json")
+        # with open(filepath) as f:
+            #write json to file
+        # need to consider what file path
+        #   for future: maybe use TinyDB instead. As a Record. and export in the same manner
+
+    def get_min():
+        #> min(y_true)
+        pass
+    def get_max():
+        pass
+    def get_col_stats():
+        pass
+        # loop thro cols, getmin and getmax for each
+    def is_rgb(): # or other image / nlp stats
+        pass
+    def get_participant_full_paths():
+        # we can do this last
+        # records the paths to the dataset that this participant submitted
+        # as a column stat? one stat for each participant?
+        pass
+        
+    # d c s t
+    # col names
+    # t
+    def get_dcst():
+        #t
+        # dig aroun d in worker code to get the path from Tags
+        # tags is firstpoplated in either poll.py or initialise.py

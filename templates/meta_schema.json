@@ -306,6 +306,11 @@
                 "FPs": {"type": ["array", "integer"]},
                 "FNs": {"type": ["array", "integer"]}
             }
+        },
+
+        "table_metadata": {
+            
+
         }
     },
     "properties": {
