@@ -100,12 +100,18 @@ schema_model = ns_api.model(
     }
 )
 
+# CFTODO: haven't looked at this properly
+table_metadata_model = ns_api.model(
+    name="table_metadata",
+    model={"*": schema_field}
+)
+
 poll_model = ns_api.model(
     name="poll",
     model={
         'headers': fields.Nested(header_model, required=True),
         'schemas': fields.Nested(schema_model, required=True),
-        #> add table_metadata here
+        'table_metadata': fields.Nested(table_metadata_model, required=True),
         # Exports will not be made available to the TTP
     }
 )
@@ -202,7 +208,7 @@ class Poll(Resource):
                     'headers': {},
                     'schemas': {},
                     'exports': {},
-                    #table_metadata
+                    'table_metadata': {},
                     'is_live': False,
                     'in_progress': [],
                     'connections': [],
@@ -268,25 +274,25 @@ class Poll(Resource):
                     logging.debug(f"Exports: {exports}")
                     print(tags)
 
-            #> look for appropriate place to call utils.MetaExtractor.extract_metadata().
-            #> either here, or inside load_and_combine and rename load_and_combine
-            #>
+                #> look for appropriate place to call utils.MetaExtractor.extract_metadata().
+                #> either here, or inside load_and_combine and rename load_and_combine
+                #>
+                
+                #> 1. get tabular/text/image from server.py detect_metadata()
+                        # issue: if there are multiple tags, IMPORTANT: All datasets detected along the declared tag MUST be of the SAME datatype!
+                                # just take the first detected tag for now
 
-            #> 1. get tabular/text/image from server.py detect_metadata()
-                    # issue: if there are multiple tags, IMPORTANT: All datasets detected along the declared tag MUST be of the SAME datatype!
-                            # just take the first detected tag for now
 
+                #> 2. extracted_metadata = extract_metadata(tabular/text/image, project_id, participant_id, tags):
+                #> print the tags and see if it's what we expect. if multiple tags for 'train', maybe just put in a list
 
-            #> 2. extracted_metadata = extract_metadata(tabular/text/image, project_id, participant_id, tags):
-            #> print the tags and see if it's what we expect. if multiple tags for 'train', maybe just put in a list
-
-            #> what were we supposed to do with headers?? colour > colour_red colour_green colour_blue
-            #> also retrieve the metadata and export to csv catalogue.json here 
-            
-            ##### Issue: implement metadata export into catalogue.json (i.e. caching)
-            ##### Should metadata be part of meta_records? Why or why not
-            ##### if it's part of meta_records then reuse the caching and export from Records/TinyDB?
-
+                #> what were we supposed to do with headers?? colour > colour_red colour_green colour_blue
+                #> also retrieve the metadata and export to csv catalogue.json here 
+                
+                ##### Issue: implement metadata export into catalogue.json (i.e. caching)
+                ##### Should metadata be part of meta_records? Why or why not
+                ##### if it's part of meta_records then reuse the caching and export from Records/TinyDB?
+            table_metadata = {"hello":"jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"}
 
             meta_records.update(
                 project_id=project_id, 
@@ -294,9 +300,8 @@ class Poll(Resource):
                     'tags': request.json['tags'],
                     'headers': headers,
                     'schemas': schemas,
-                    'exports': exports
-                    #> add metadata here
-                    'metadata': None # extracted_metadata # maybe uniformly call table_metadata
+                    'exports': exports,
+                    'table_metadata': table_metadata # extracted_metadata 
                 }
             )
             data = meta_records.read(project_id)
@@ -309,6 +314,7 @@ class Poll(Resource):
 
         # insert amundsen payload here. in future add a new _schema.json to describe amundsen/metadata?
         # data['headers'] expected
+        data["asdadadsads"] = "000000000000000000000000000"
 
         success_payload = payload_formatter.construct_success_payload(
             status=200,
@@ -316,4 +322,6 @@ class Poll(Resource):
             params=request.view_args,
             data=data
         )
+        print("***ssss***")
+        print(success_payload)
         return success_payload, 200

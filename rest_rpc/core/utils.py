@@ -769,7 +769,7 @@ class MetaExtractor:
 
 
     def extract_metadata(data_type, project_id, participant_id, tags, collab_name=None):
-
+        '''
         # Caching
         if catalogue.json already exists:
             load catalogue.json into self.table_metadata
@@ -787,23 +787,51 @@ class MetaExtractor:
 
         # Logic switch for data_type
         if is_tabular:
-            get_min
-            get_max
+
+ 
         else is_image:
-            get_rgb
+ 
         else is_text:
             ???
         
-        self.metadata = 
+        self.table_metadata = 
 
+        {
+            d
+            c
+            s
+            t
+            columns: [
+                {
+                    colname: "first column",
+                    stats [  
+                        "min": 1,
+                        "max": 9999
+                    ]
+                },
+                {
+                    colname: "second column",
+                    stats [  
+                        "min": -999,
+                        "max": 1000
+                        "start_epoch":
+                        "end_epoch":
+                    ]
+                },
+                
+                
+            ]
 
+        }
 
+        '''
 
         #populate the data structure
     def export_metadata():
         '''
         Save the "catalogue.json" or whatever new file name we decide, to worker's container probably in /data
         '''
+        pass
         #save_to_file(self.metadata)
         # json.loads(metadata) ("get a .json")
         # with open(filepath) as f:
@@ -814,6 +842,7 @@ class MetaExtractor:
     def get_min():
         #> min(y_true)
         pass
+
     def get_max():
         pass
     def get_col_stats():
@@ -831,6 +860,7 @@ class MetaExtractor:
     # col names
     # t
     def get_dcst():
+        pass
         #t
         # dig aroun d in worker code to get the path from Tags
         # tags is firstpoplated in either poll.py or initialise.py

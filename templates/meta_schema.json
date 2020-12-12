@@ -309,7 +309,11 @@
         },
 
         "table_metadata": {
-            
+            "description": "Statistical results of an experiment-run",
+            "type": "object",
+            "properties": {
+                "hello": { "type": "string"}
+            }
 
         }
     },
@@ -320,6 +324,8 @@
         "schemas"   : {"$ref": "#/definitions/schemas"},
         "exports"   : {"$ref": "#/definitions/exports"},
         "alignments": {"$ref": "#/definitions/alignments"},
+        "table_metadata":  {"$ref": "#/definitions/table_metadata"},
+
 
         "is_live": {
             "description": "Boolean switching tracking state of project",
@@ -369,5 +375,5 @@
         }
     },
 
-    "required": ["tags", "headers", "schemas", "exports"]
+    "required": ["tags", "headers", "schemas", "exports", "table_metadata"]
 }
