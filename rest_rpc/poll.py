@@ -227,6 +227,7 @@ class Poll(Resource):
             # try:
             headers = {}
             schemas = {}
+            metadata = {}
             exports = {}
             for meta, tags in request.json['tags'].items():
 
@@ -239,7 +240,7 @@ class Poll(Resource):
                     project_cache_dir = os.path.join(project_meta_dir, "cache")
                     os.makedirs(project_cache_dir, exist_ok=True)
 
-                    (X_tensor, y_tensor, X_header, y_header, schema, df
+                    (X_tensor, y_tensor, X_header, y_header, schema, df, meta_stats
                     ) = load_and_combine(
                         action=request.json['action'],
                         tags=tags, 
@@ -270,6 +271,7 @@ class Poll(Resource):
                     }
                     headers[meta] = {'X': X_header, 'y': y_header}
                     schemas[meta] = schema
+                    metadata[meta] = meta_stats
 
                     logging.debug(f"Exports: {exports}")
                     print(tags)
@@ -292,7 +294,6 @@ class Poll(Resource):
                 ##### Issue: implement metadata export into catalogue.json (i.e. caching)
                 ##### Should metadata be part of meta_records? Why or why not
                 ##### if it's part of meta_records then reuse the caching and export from Records/TinyDB?
-            table_metadata = {"hello":"jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"}
 
             meta_records.update(
                 project_id=project_id, 
@@ -300,8 +301,8 @@ class Poll(Resource):
                     'tags': request.json['tags'],
                     'headers': headers,
                     'schemas': schemas,
-                    'exports': exports,
-                    'table_metadata': table_metadata # extracted_metadata 
+                    'metadata': metadata, # extracted_metadata, just use metadata cause worker should not know we are using metadata
+                    'exports': exports
                 }
             )
             data = meta_records.read(project_id)

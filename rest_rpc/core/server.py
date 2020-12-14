@@ -30,6 +30,7 @@ from rest_rpc.core.pipelines import (
     ImagePipe, 
     TextPipe
 )
+from rest_rpc.core.utils import MetaExtractor
 from rest_rpc.core.custom import CustomServerWorker
 
 ##################
@@ -342,8 +343,17 @@ def load_and_combine(
 
         # preprocessor.offload()
 
+        # Embed MetadataExtractor here!!!
+        meta_extractor = MetaExtractor(
+            df=data, 
+            schema=schema,
+            dataset_type=datatype  # Dataset_type is either tab, img, txt
+        )
+        meta_extractor.extract() # self.metadata = None --> self.metadata = {'cat_variables': {...}, 'num_variables': {...}}
+
         logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}")
         logging.debug(f"y_combined_header: {y_combined_header} {len(y_combined_header)}")
+        logging.debug(f"Extracted Metadata: {meta_extractor.metadata}")
 
         return (
             X_combined_tensor, 
@@ -351,7 +361,8 @@ def load_and_combine(
             X_combined_header, 
             y_combined_header, 
             preprocessor.schema,
-            preprocessor.output
+            preprocessor.output,
+            meta_extractor.metadata
         )
 
 
