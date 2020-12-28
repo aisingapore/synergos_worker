@@ -229,11 +229,13 @@ cache_dir = os.path.join(OUT_DIR, "$project_id", "preprocessing")
 aggregated_X_outpath = os.path.join(cache_dir, "preprocessed_X_$meta.npy")
 aggregated_y_outpath = os.path.join(cache_dir, "preprocessed_y_$meta.npy")
 aggregated_df_outpath = os.path.join(cache_dir, "combined_dataframe_$meta.csv")
+catalogue_outpath = os.path.join(cache_dir, "catalogue.json")
 CACHE_TEMPLATE = {
     'out_dir': Template(cache_dir),
     'X': Template(aggregated_X_outpath),
     'y': Template(aggregated_y_outpath),
-    'dataframe': Template(aggregated_df_outpath)
+    'dataframe': Template(aggregated_df_outpath),
+    'catalogue': Template(catalogue_outpath)
 }
 
 predict_outdir = os.path.join(

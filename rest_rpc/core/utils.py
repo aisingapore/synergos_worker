@@ -57,8 +57,6 @@ schemas = app.config['SCHEMAS']
 db_path = app.config['DB_PATH']
 payload_template = app.config['PAYLOAD_TEMPLATE']
 
-label_binarizer = LabelBinarizer()
-
 ####################
 # Helper Functions #
 ####################
@@ -741,23 +739,26 @@ class Benchmarker:
         """
         raise NotImplementedError
 
-####################################
+#######################################
 # MetaExtractor Class - MetaExtractor #
-####################################
+#######################################
 
 class MetaExtractor:
-    """ does the extraction
+    """ Given a dataset of a specific type, extract the appropriate meta
+        statistics for ease of summary
 
     Attributes:
-        y_true (np.ndarray): Truth labels loaded into WSSW
-        y_pred (np.ndarray): Predictions obtained from TTP, casted into classes
-        y_score (np.ndarray): Raw scores/probabilities obtained from TTP
+        df (pd.DataFrame): Dataset to extract metrics from 
+        schema
     """
-    def __init__(self, df: pd.DataFrame, schema: Dict[str, str], dataset_type: str):
+    def __init__(
+        self, 
+        df: pd.DataFrame, 
+        schema: Dict[str, str], 
+        dataset_type: str
+    ):
         # Private attibutes
-        self.metadata = None # must update and sync with meta_schema.json table_metadata  
-        # also known as catalogue.json 
-        #   in future: maybe should instantiate as a Records class and populate? 
+        self.metadata = None
         
         # Public Attributes
         self.df = df
@@ -768,10 +769,12 @@ class MetaExtractor:
     # Helpers #
     ###########
 
-    def extract_categorical_feature_metadata(self, name: str) -> Dict[str, Union[int, float]]:
-        """ Extracts relevant statistics from a single categorical feature, according to the 
-            specified dataset type (i.e. tabular, image, text). For categorical variables, 
-            supported metadata extracted include:
+    @staticmethod
+    def extract_categorical_feature_metadata(
+        feature: pd.Series
+    ) -> Dict[str, Union[List[str], int, float]]:
+        """ Extracts relevant statistics from a single categorical feature.
+            For categorical variables, supported metadata extracted include:
             1) Labels
             2) Count
             3) Unique
@@ -779,35 +782,36 @@ class MetaExtractor:
             5) Frequency 
 
         Args:
-            name (str): Name of feature column
+            feature (pd.Series): Name of feature column
         Returns:
             Categorical Meta statistics (Dict)
         """
-        if self.schema[feature] == "category":
+        datatype = feature.dtype.name
 
-            feature = self.df[name]
-            col_values = feature.values
-
+        if datatype == "category":
+            
             # Extract class labels
-            lb = LabelBinarizer()
-            lb.fit(col_values)
-            labels = list(lb.classes_)
+            labels = feature.cat.categories.to_list()
+            logging.debug(f"------> {[type(v) for v in labels]}")
 
             # Extract meta statistics
             meta_stats = feature.describe().to_dict()
+            logging.debug(f"------> {[type(v) for k,v in meta_stats.items()]}")
 
             # Add in class label information
             meta_stats.update({'labels': labels})
             return meta_stats
 
         else:
-            raise NotImplementedError(f"This {self.schema[feature]} is not a categorical variable!")
+            raise RuntimeError(f"Feature '{feature.name}' is not a categorical variable!")
 
 
-    def extract_numeric_feature_metadata(self, name: str) -> Dict[str, Union[int, float]]:
-        """ Extracts relevant statistics from a single numeric feature, according to the specified
-            dataset type (i.e. tabular, image, text). For numeric variables, 
-            supported metadata extracted include:
+    @staticmethod
+    def extract_numeric_feature_metadata(
+        feature: pd.Series
+    ) -> Dict[str, Union[int, float]]:
+        """ Extracts relevant statistics from a single numeric feature.
+            For numeric variables, supported metadata extracted include:
             1) Count
             2) Mean
             3) Std
@@ -818,45 +822,227 @@ class MetaExtractor:
             8) max 
 
         Args:
-            name (str): Name of feature column
+            feature (pd.Series): Name of feature column
         Returns:
             Numerical Meta statistics (Dict)
         """
-        if self.schema[feature] != "category":
-           
-            # Extract meta statistics
-            feature = self.df[name]
-            meta_stats = feature.describe().to_dict()
-            return meta_stats
+        datatype = feature.dtype.name
+        
+        if datatype not in ["category", "object"]: # capture nulls
+            logging.debug(f"------> {[type(v) for k,v in feature.describe().to_dict().items()]}")
+
+            return feature.describe().to_dict()
 
         else:
-            raise NotImplementedError(f"This {self.schema[feature]} is not a numerical variable!")
+            raise RuntimeError(f"Feature '{name}' is not a numerical variable!")
+
+
+    @staticmethod
+    def extract_object_feature_metadata(feature: pd.Series) -> dict:
+        """ Extracts relevant statistics from a single object feature. 
+
+            Note: 
+            This is a placeholder function to handle nullities/incompatibilities
+            in the event that the specified dataset was not thoroughly cleaned
+
+        Args:
+            feature (pd.Series): Name of feature column
+        Returns:
+            An empty dictionary (Dict)
+        """
+        return {}
+
+
+    def extract_tabular_metadata(
+        self
+    ) -> Dict[str, Dict[str, Union[List[str], int, float]]]:
+        """ Extracts meta data/statistics from a specified tabular dataset.
+            Expected metadata format:
+            {
+                'features': {
+                    'cat_variables': {
+                        'cat_feature_1': {'datatype': "category", ...},
+                        ...
+                    },
+                    'num_variables': {
+                        'num_feature_1': {'datatype': "integer", ...},
+                        ...
+                    },
+                    'misc_variables': {
+                        'misc_feature_1': {'datatype': "object"},
+                        ...
+                    }
+                }
+            }
+
+        Returns:
+            Tabular meta statistics (Dict)
+        """
+        if self.dataset_type == "tabular":
+
+            # Ensures that template always has consistent keys
+            metadata = {
+                'cat_variables': {},
+                'num_variables': {},
+                'misc_variables': {}
+            }
+            for name in self.df.columns:
+
+                feature = self.df[name]
+                datatype = self.schema[name] # robust datatype extraction
+
+                # Check that datatype is not ambigious (eg. null, list, etc.)
+                if datatype == "object":
+                    variable_key = 'misc_variables'
+                    meta_stats = self.extract_object_feature_metadata(feature)
+
+                # Check that datatype is categorical
+                elif datatype == "category":
+                    variable_key = 'cat_variables'
+                    meta_stats = self.extract_categorical_feature_metadata(feature)
+
+                # Check that datatype is numerical
+                else:
+                    ###########################
+                    # Implementation Footnote #
+                    ###########################
+                    
+                    # [Cause]
+                    # There are many other datatypes apart from objects & 
+                    # categories in numpy.
+
+                    # [Problems]
+                    # This results in ambiguity when inferring numeric datatypes
+
+                    # [Solution]
+                    # Assume that all boolean types are specified as categories
+
+                    variable_key = 'num_variables'
+                    meta_stats = self.extract_numeric_feature_metadata(feature)
+
+                meta_stats['datatype'] = datatype
+
+                variable_stats = metadata.get(variable_key, {})
+                variable_stats[name] = meta_stats
+                metadata.update({variable_key: variable_stats})
+            
+            return {'features': metadata}
+        
+        else:
+            raise RuntimeError(f"Dataset is not of type tabular!")
+
+
+    def extract_image_metadata(self) -> Dict[str, Union[int, str]]:
+        """ Extracts meta data/statistics from a specified tabular dataset.
+            Expected metadata format:
+            {
+                'pixel_height': 255,
+                'pixel_width': 255,
+                'color': "rgb", # for now, only grayscale & RGB is supported
+            }
+
+        Returns:
+            Image meta statistics
+        """
+        if self.dataset_type == "image":
+
+            # Columns of image DFs are named "{img_format}x{height}x{width}"
+            features = self.df.drop(columns=['target'])
+            color, pixel_height, pixel_width = features.columns[-1].split('x')
+
+            return {
+                'pixel_height': int(pixel_height),
+                'pixel_width': int(pixel_width),
+                'color': color
+            }
+
+        else:
+            raise RuntimeError(f"Dataset is not of type image!")
+
+    
+    def extract_text_metadata(self) -> Dict[str, Union[int, float]]:
+        """ Extracts meta data/statistics from a specified text dataset. 
+        
+            Assumption:
+            Text datasets are represented as doc-term matrices
+
+            Expected metadata format:
+            {
+                'word_count': 5000,     # Total no. of words represented
+                'sparsity': 0.6         # count(zeros)/total of doc-term matrix
+                'representation': 0.2   # sum(non-zeros)/total of doc-term matrix
+            }
+
+        Returns:
+            Text meta statistics (Dict)
+        """
+        if self.dataset_type == "text":
+
+            features = self.df.drop(columns=['target'])
+
+            doc_count, word_count = features.shape
+
+            total_cells = doc_count * word_count
+
+            zero_count = features[features==0].count().sum()
+            sparsity = zero_count/total_cells
+
+            non_zero_sum = features.sum().sum()  # .sum().sum() bypasses nullity
+            representation = non_zero_sum/total_cells
+
+            return {
+                'word_count': word_count,
+                'sparsity': sparsity,
+                'representation': representation
+            }
+
+        else:
+            raise RuntimeError(f"Dataset is not of type text!")
+
+
+    def extract_generic_metadata(self) -> Dict[str, Union[int, str]]:
+        """ Extracts generic meta data/statistics of the specified dataset.
+
+        Returns:
+            Generic meta statistics (Dict)
+        """
+        return {
+            'src_count': len(self.df),
+            '_type': self.dataset_type
+        }
 
     ##################
     # Core functions #
     ##################
 
-    def extract():
-        """ Extracts & compiles all metadata for each feature within the specified dataset
+    def extract(self) -> Dict[str, Union[str, int, float, dict]]:
+        """ Extracts & compiles all metadata for each feature within the 
+            specified dataset.
 
+            Expected metadata format:
+            {
+                'src_count': 1000,
+                '_type': "<insert datatype>",
+                'characteristics': {
+                    <insert type-specific meta statistics>
+                }
+            }
+
+        Returns:
+            Data-specific meta statistics (Dict)
         """
-        if self.dataset_type == "tabular":
-            metadata = {}
-            for name in self.df.columns:
+        EXTRACTORS = {
+            'tabular': self.extract_tabular_metadata,
+            'image': self.extract_image_metadata,
+            'text': self.extract_text_metadata
+        }
+        supported_dataset_types = list(EXTRACTORS.keys())
 
-                datatype = self.schema[name]
-                variable_key = 'cat_variables' if datatype == "category" else 'num_variables'
-                meta_stats = (
-                    self.extract_categorical_feature_metadata(name=name) 
-                    if datatype == "category" 
-                    else self.extract_numeric_feature_metadata(name=name)
-                )
-                variable_stats = metadata.get(variable_key, {})
-                variable_stats[name] = meta_stats
-                metadata.update({variable_key: variable_stats})
-                
-        else:
-            metadata = {}
+        if self.dataset_type not in supported_dataset_types:
+            raise RuntimeError(f"{self.dataset_type} is not yet supported!")
+            
+        generic_metadata = self.extract_generic_metadata()
+        type_specific_metadata = EXTRACTORS[self.dataset_type]()
 
-        self.metadata = metadata
+        self.metadata = {**generic_metadata, **type_specific_metadata}
         return self.metadata

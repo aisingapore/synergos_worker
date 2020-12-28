@@ -74,7 +74,7 @@ class Preprocessor(BasePipe):
     def __init__(
         self,
         datatype: str, 
-        data: pd.DataFrame,
+        data: pd.DataFrame, # this is an eyesore
         schema: Dict[str, str] = None,
         seed: int = 42, 
         boost_iter: int = 100, 
@@ -303,7 +303,16 @@ class Preprocessor(BasePipe):
     
 
     def extract_image_metadata(self):
-        """
+        """ Extracts image metadata from specified dataset. Support image
+            metadata include:
+            1) Pixel height
+            2) Pixel width
+            3) Pixel padding
+
+        Returns:
+            pixel_pad (tuple)
+            pixel_height (int)
+            pixel_width (int)
         """
         if self.datatype == "image":
 
@@ -341,12 +350,13 @@ class Preprocessor(BasePipe):
         return df
 
 
-    @staticmethod
-    def pad_texts(df):
+    def pad_texts(self, df):
         """ Add in spacer values corresponding to each missing coordinate in the
             word vector.
         """
-        return df.fillna(0)
+        features = df.drop(columns=['target']).fillna(0)
+        features['target'] = df.target
+        return features
     
 
     def align_dataset(self, dataset: np.ndarray, alignment_idxs: List[int]):

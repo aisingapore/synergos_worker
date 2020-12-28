@@ -5,6 +5,7 @@
 ####################
 
 # Generic/Built-in
+import json
 import logging
 import os
 from pathlib import Path
@@ -41,6 +42,7 @@ outdir_template = cache_template['out_dir']
 X_template = cache_template['X']
 y_template = cache_template['y']
 df_template = cache_template['dataframe']
+catalogue_template = cache_template['catalogue']
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -88,7 +90,7 @@ header_model = ns_api.model(
 schema_field = fields.Wildcard(fields.String())
 meta_model = ns_api.model(
     name="meta_schema",
-    model={"*": schema_field}
+    model={"*": schema_field}   # eg. {'x1': "float64", 'x2': "int64", ...}
 )
 
 schema_model = ns_api.model(
@@ -100,10 +102,121 @@ schema_model = ns_api.model(
     }
 )
 
-# CFTODO: haven't looked at this properly
-table_metadata_model = ns_api.model(
-    name="table_metadata",
-    model={"*": schema_field}
+generic_feature_model = ns_api.model(
+    name="generic_feature_stats",
+    model={'datatype': fields.String(required=True)}
+)
+
+categorical_feature_model = ns_api.inherit(
+    "categorical_feature_metadata",
+    generic_feature_model,
+    {
+        'labels': fields.List(fields.String(), required=True),
+        'count': fields.Integer(required=True),
+        'unique': fields.Integer(required=True),
+        'top': fields.String(required=True),
+        'freq': fields.Integer(required=True)
+    }
+)
+categorical_meta_field = fields.Wildcard(fields.Nested(categorical_feature_model))
+categorical_meta_model = ns_api.model(
+    name="categorical_metadata",
+    model={"*": categorical_meta_field}
+)
+
+numeric_feature_model = ns_api.inherit(
+    "numeric_feature_metadata",
+    generic_feature_model,
+    {
+        'count': fields.Float(required=True),
+        'mean': fields.Float(required=True),
+        'std': fields.Float(required=True),
+        'min': fields.Float(required=True),
+        '25%': fields.Float(required=True),
+        '50%': fields.Float(required=True),
+        '75%': fields.Float(required=True),
+        'max': fields.Float(required=True)
+    }
+)
+numeric_meta_field = fields.Wildcard(fields.Nested(numeric_feature_model))
+numeric_meta_model = ns_api.model(
+    name="numeric_metadata",
+    model={"*": numeric_meta_field}
+)
+
+misc_meta_field = fields.Wildcard(fields.Nested(generic_feature_model))
+misc_meta_model = ns_api.model(
+    name="misc_metadata",
+    model={"*": misc_meta_field} # No marshalling enforced
+)
+
+feature_summary_meta_model = ns_api.model(
+    name="feature_summary_metadata",
+    model={
+        'cat_variables': fields.Nested(
+            categorical_meta_model, required=True, skip_none=True, 
+        ),
+        'num_variables': fields.Nested(
+            numeric_meta_model, required=True, skip_none=True,
+        ),
+        'misc_variables': fields.Nested(
+            misc_meta_model, required=True, skip_none=True,
+        )
+    }
+)
+
+tabular_meta_model = ns_api.model(
+    name="tabular_metadata",
+    model={
+        'features': fields.Nested(
+            feature_summary_meta_model, 
+            required=True, 
+            default={}
+        )
+    }
+)
+
+image_meta_model = ns_api.model(
+    name="image_metadata",
+    model={
+        'pixel_height': fields.Integer(required=True),
+        'pixel_width': fields.Integer(required=True),
+        'color': fields.String(required=True)
+    }
+)
+
+text_meta_model = ns_api.model(
+    name="text_metadata",
+    model={
+        'word_count': fields.Integer(required=True),
+        'sparsity': fields.Float(required=True),
+        'representation': fields.Float(required=True)
+    }
+)
+
+generic_meta_model = ns_api.model(
+    name="generic_metadata",
+    model={
+        'src_count': fields.Integer(required=True),
+        '_type': fields.String(required=True)
+    }
+)
+
+dataset_meta_model = ns_api.inherit(
+    "dataset_metadata", 
+    generic_meta_model,
+    tabular_meta_model,
+    image_meta_model,
+    text_meta_model
+)
+
+metadata_model = ns_api.model(
+    name="metadata",
+    model={
+        'train': fields.Nested(dataset_meta_model, required=True, skip_none=True),
+        'evaluate': fields.Nested(dataset_meta_model, skip_none=True),
+        'predict': fields.Nested(dataset_meta_model, skip_none=True)
+    }
 )
 
 poll_model = ns_api.model(
@@ -111,8 +224,8 @@ poll_model = ns_api.model(
     model={
         'headers': fields.Nested(header_model, required=True),
         'schemas': fields.Nested(schema_model, required=True),
-        'table_metadata': fields.Nested(table_metadata_model, required=True),
-        # Exports will not be made available to the TTP
+        'metadata': fields.Nested(metadata_model, required=True),
+        # Exports will not be made available to the TTP 
     }
 )
 
@@ -207,8 +320,9 @@ class Poll(Resource):
                     'tags': {},
                     'headers': {},
                     'schemas': {},
+                    'metadata': {},
                     'exports': {},
-                    'table_metadata': {},
+                    'metadata': {},
                     'is_live': False,
                     'in_progress': [],
                     'connections': [],
@@ -240,7 +354,12 @@ class Poll(Resource):
                     project_cache_dir = os.path.join(project_meta_dir, "cache")
                     os.makedirs(project_cache_dir, exist_ok=True)
 
-                    (X_tensor, y_tensor, X_header, y_header, schema, df, meta_stats
+                    (
+                        X_tensor, y_tensor, 
+                        X_header, y_header, 
+                        schema, 
+                        df, 
+                        meta_stats
                     ) = load_and_combine(
                         action=request.json['action'],
                         tags=tags, 
@@ -274,26 +393,17 @@ class Poll(Resource):
                     metadata[meta] = meta_stats
 
                     logging.debug(f"Exports: {exports}")
-                    print(tags)
 
-                #> look for appropriate place to call utils.MetaExtractor.extract_metadata().
-                #> either here, or inside load_and_combine and rename load_and_combine
-                #>
-                
-                #> 1. get tabular/text/image from server.py detect_metadata()
-                        # issue: if there are multiple tags, IMPORTANT: All datasets detected along the declared tag MUST be of the SAME datatype!
-                                # just take the first detected tag for now
-
-
-                #> 2. extracted_metadata = extract_metadata(tabular/text/image, project_id, participant_id, tags):
-                #> print the tags and see if it's what we expect. if multiple tags for 'train', maybe just put in a list
-
-                #> what were we supposed to do with headers?? colour > colour_red colour_green colour_blue
-                #> also retrieve the metadata and export to csv catalogue.json here 
-                
-                ##### Issue: implement metadata export into catalogue.json (i.e. caching)
-                ##### Should metadata be part of meta_records? Why or why not
-                ##### if it's part of meta_records then reuse the caching and export from Records/TinyDB?
+            # Export headers, schema & metadata extracted to "catalogue.json"
+            catalogue_outpath = catalogue_template.safe_substitute({'project_id': project_id})            
+            catalogue = {
+                'headers': headers, 
+                'schemas': schemas, 
+                'metadata': metadata
+            }
+            logging.debug(f"-----> {catalogue}")
+            with open(catalogue_outpath, 'w') as cp:
+                json.dump(catalogue, cp)
 
             meta_records.update(
                 project_id=project_id, 
@@ -301,11 +411,12 @@ class Poll(Resource):
                     'tags': request.json['tags'],
                     'headers': headers,
                     'schemas': schemas,
-                    'metadata': metadata, # extracted_metadata, just use metadata cause worker should not know we are using metadata
+                    'metadata': metadata, 
                     'exports': exports
                 }
             )
             data = meta_records.read(project_id)
+            logging.debug(f">>>> {data}")
 
             # except KeyError:
             #     ns_api.abort(                
@@ -313,16 +424,10 @@ class Poll(Resource):
             #         message="Insufficient info specified for metadata tracing!"
             #     )
 
-        # insert amundsen payload here. in future add a new _schema.json to describe amundsen/metadata?
-        # data['headers'] expected
-        data["asdadadsads"] = "000000000000000000000000000"
-
         success_payload = payload_formatter.construct_success_payload(
             status=200,
             method="poll.post",
             params=request.view_args,
             data=data
         )
-        print("***ssss***")
-        print(success_payload)
         return success_payload, 200

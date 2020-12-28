@@ -161,6 +161,170 @@
             }
         },
 
+        "metadata": {
+            "description": "Metadata describing a participant's registered dataset(s)",
+            "type": "object",
+            "properties": {
+
+                "src_count": {
+                    "description": "Total no. of observations within the dataset",
+                    "type": "integer"
+                },
+
+                "_type": {
+                    "description": "Type of dataset (i.e. tabular, image, text)",
+                    "type": "string"
+                },
+
+                "cat_variables": {
+                    "description": "Meta-statistics for categorical variables",
+                    "type": "object",
+                    "patternProperties": {
+    
+                        "^.*$": {
+                            "type": "object",
+                            "properties": {
+
+                                "datatype": {
+                                    "description": "Granular type description of feature",
+                                    "type": "string"
+                                },
+
+                                "labels": {
+                                    "description": "Possible class labels",
+                                    "type": "array",
+                                    "items": {"type": "string"}
+                                },
+
+                                "count": {
+                                    "description": "Total no. of feature values detected",
+                                    "type": "integer"
+                                },
+
+                                "unique": {
+                                    "description": "No. of class labels supported",
+                                    "type": "integer"
+                                },
+
+                                "top": {
+                                    "description": "Class label with the highest coverage",
+                                    "type": "string"
+                                },
+                                
+                                "freq": {
+                                    "description": "Total no. of occurrence for the highest coverage label",
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+        
+                    "additionalProperties": false
+                },
+
+                "num_variables": {
+                    "description": "Meta-statistics for numeric variables",
+                    "type": "object",
+                    "patternProperties": {
+    
+                        "^.*$": {
+                            "type": "object",
+                            "properties": {
+                                
+                                "datatype": {
+                                    "description": "Granular type description of feature",
+                                    "type": "string"
+                                },
+
+                                "count": {
+                                    "description": "Total no. of feature values detected",
+                                    "type": "number"
+                                },
+
+                                "mean": {
+                                    "description": "Mean of numeric feature values",
+                                    "type": "number"
+                                },
+
+                                "std": {
+                                    "description": "Standard deviation of numeric feature values",
+                                    "type": "number"
+                                },
+                                
+                                "min": {
+                                    "description": "Minimum value of numeric feature values",
+                                    "type": "number"
+                                },
+
+                                "25%": {
+                                    "description": "25th percentile of numeric feature values",
+                                    "type": "number"
+                                },
+
+                                "50%": {
+                                    "description": "50th percentile of numeric feature values",
+                                    "type": "number"
+                                },
+
+                                "75%": {
+                                    "description": "75th percentile of numeric feature values",
+                                    "type": "number"
+                                },
+
+                                "max": {
+                                    "description": "Maximum value of numeric feature values",
+                                    "type": "number"
+                                }
+                            }
+                        }
+                    },
+        
+                    "additionalProperties": false
+                },
+
+                "misc_variables": {
+                    "description": "Meta-statistics for numeric variables",
+                    "type": "object",
+                    "patternProperties": {
+    
+                        "^.*$": {"type": "object"}
+                    },
+        
+                    "additionalProperties": false
+                },
+
+                "pixel_height": {
+                    "description": "Vertical dimension of declared image dataset",
+                    "type": "integer"
+                },
+
+                "pixel_width": {
+                    "description": "horizontal dimension of declared image dataset",
+                    "type": "integer"
+                },
+
+                "color": {
+                    "description": "Color space that images are encoded in",
+                    "type": "string"
+                },
+            
+                "word_count": {
+                    "description": "No. or words in the corpus",
+                    "type": "integer"
+                },
+
+                "sparsity": {
+                    "description": "count(zeros)/total of doc-term matrix",
+                    "type": "number"
+                },
+
+                "representation": {
+                    "description": "sum(non-zeros)/total of doc-term matrix",
+                    "type": "number"
+                }
+            }
+        },
+
         "exports": {
             "description": "Paths to all exported tensors",
             "type": "object",
@@ -306,15 +470,6 @@
                 "FPs": {"type": ["array", "integer"]},
                 "FNs": {"type": ["array", "integer"]}
             }
-        },
-
-        "table_metadata": {
-            "description": "Statistical results of an experiment-run",
-            "type": "object",
-            "properties": {
-                "hello": { "type": "string"}
-            }
-
         }
     },
     "properties": {
@@ -322,10 +477,9 @@
         "tags"      : {"$ref": "#/definitions/tags"},
         "headers"   : {"$ref": "#/definitions/headers"},
         "schemas"   : {"$ref": "#/definitions/schemas"},
+        "metadata"  : {"$ref": "#/definitions/metadata"},
         "exports"   : {"$ref": "#/definitions/exports"},
         "alignments": {"$ref": "#/definitions/alignments"},
-        "table_metadata":  {"$ref": "#/definitions/table_metadata"},
-
 
         "is_live": {
             "description": "Boolean switching tracking state of project",
@@ -375,5 +529,5 @@
         }
     },
 
-    "required": ["tags", "headers", "schemas", "exports", "table_metadata"]
+    "required": ["tags", "headers", "schemas", "metadata", "exports"]
 }

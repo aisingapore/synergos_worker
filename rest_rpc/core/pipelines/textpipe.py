@@ -601,6 +601,6 @@ class TextPipe(BasePipe):
 
             self.output = self.create_docterm_matrix(unified_corpus)
 
-        logging.debug(f"Doc-term matrix: {self.output.data}")
+        logging.debug(f"Doc-term matrix: {self.output}")
 
         return self.output

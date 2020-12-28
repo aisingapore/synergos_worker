@@ -341,15 +341,15 @@ def load_and_combine(
             is_condensed=is_condensed # before MFA, data MUST NOT be condensed
         )
 
-        # preprocessor.offload()
+        preprocessor.offload()
 
-        # Embed MetadataExtractor here!!!
         meta_extractor = MetaExtractor(
-            df=data, 
-            schema=schema,
+            df=preprocessor.output, 
+            schema=preprocessor.schema,
             dataset_type=datatype  # Dataset_type is either tab, img, txt
         )
-        meta_extractor.extract() # self.metadata = None --> self.metadata = {'cat_variables': {...}, 'num_variables': {...}}
+        
+        meta_extractor.extract() 
 
         logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}")
         logging.debug(f"y_combined_header: {y_combined_header} {len(y_combined_header)}")
