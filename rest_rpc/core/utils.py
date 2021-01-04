@@ -1023,9 +1023,8 @@ class MetaExtractor:
             {
                 'src_count': 1000,
                 '_type': "<insert datatype>",
-                'characteristics': {
-                    <insert type-specific meta statistics>
-                }
+                <insert type-specific meta statistics>
+                ...
             }
 
         Returns:

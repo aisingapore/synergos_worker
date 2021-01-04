@@ -457,7 +457,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
             target_alignment = all_alignments[meta]['y']
             logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
         
-            X_aligned, y_aligned, _, _, _, _ = load_and_combine(
+            X_aligned, y_aligned, _, _, _, _, _ = load_and_combine(
                 action=action,
                 tags=tags,
                 X_alignments=feature_alignment,

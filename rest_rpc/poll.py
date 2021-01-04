@@ -305,7 +305,17 @@ class Poll(Resource):
                         "X5": "int32", 
                         "X6": "category", 
                         "target": "category"
-                    }
+                    },
+                    ...
+                },
+                "metadata":{
+                    "train":{
+                        'src_count': 1000,
+                        '_type': "<insert datatype>",
+                        <insert type-specific meta statistics>
+                        ...
+                    },
+                    ...
                 }
             }
         """
