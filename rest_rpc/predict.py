@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 
 # Libs
-import jsonschema
 import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
@@ -22,8 +21,8 @@ from rest_rpc.core.utils import (
     Benchmarker, 
     construct_combination_key
 )
-from rest_rpc.initialise import cache
-from rest_rpc.align import alignment_model
+from rest_rpc.core.server import load_and_combine
+from rest_rpc.initialise import init_input_model
 
 ##################
 # Configurations #
@@ -47,6 +46,10 @@ y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
 
+cache = app.config['CACHE']
+
+cache_template = app.config['CACHE_TEMPLATE']['out_dir']
+
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
 ###########################################################
@@ -69,10 +72,10 @@ inferences_model = ns_api.model(
     }
 )
 
-prediction_input_model = ns_api.model(
-    name="prediction_input",
-    model={
-        'action': fields.String(required=True),
+prediction_input_model = ns_api.inherit(
+    "prediction_input",
+    init_input_model,
+    {
         'inferences': fields.Nested(inferences_model, required=True)
     }
 )
@@ -188,6 +191,20 @@ class Prediction(Resource):
 
             {
                 "action": "classify",
+                "tags": {
+                    "train": [["type_a","v2"], ["type_b","v3"]],
+                    "evaluate": [["type_c", "v1"]]
+                },
+                "alignments": {
+                    "train": {
+                        "X": [0,1,3,6,8],
+                        "y": [1]
+                    },
+                    "evaluate": {
+                        "X": [0,1,3,6,8,9],
+                        "y": [2],
+                    }
+                },
                 "inferences": {
                     "train": {},
                     "evaluate": {
@@ -238,19 +255,25 @@ class Prediction(Resource):
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
         
-        if (retrieved_metadata and 
-            expt_run_key in retrieved_metadata['in_progress']):
-
+        # if (retrieved_metadata and 
+        #     expt_run_key in retrieved_metadata['in_progress']):
+        if retrieved_metadata:
             # Assumption: 
             # When inference is in progress, WSSW object is active & is stored
             # in cache for retrieval/operation
-            wss_worker = cache[project_id]['participant']
+            # wss_worker = cache.get(project_id)['participant']
 
-            logging.debug(f"Objects in WSSW: {wss_worker._objects}")
-            logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}")
+            # logging.debug(f"Objects in WSSW: {wss_worker._objects}")
+            # logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}")
 
             try:
                 action = request.json['action']
+                all_tags = request.json['tags']
+                all_alignments = request.json['alignments']
+                project_cache_dir = os.path.join(
+                    cache_template.safe_substitute(project_id=project_id), 
+                    "cache"
+                )
 
                 results = {} # only accumulate for metas that have changed
                 for meta, inference in request.json['inferences'].items():
@@ -275,7 +298,21 @@ class Prediction(Resource):
                         y_score = np.array(inference['y_score'])
 
                         # Retrieved aligned y_true labels
-                        labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+                        # labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
+                        # labels_path = retrieved_metadata['exports'][meta]['y']
+                        # with open(labels_path, 'r') as lp:
+                        #     labels = np.load(labels_path)
+                        tags = all_tags[meta]
+                        feature_alignment = all_alignments[meta]['X']
+                        target_alignment = all_alignments[meta]['y']
+                        _, labels , _, _, _, _, _ = load_and_combine(
+                            action=action,
+                            tags=tags,
+                            X_alignments=feature_alignment,
+                            y_alignments=target_alignment,
+                            is_condensed=True, # After MFA, data MUST be condensed!
+                            out_dir=project_cache_dir
+                        )
 
                         logging.debug(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}")
                         logging.debug(f"Labels: {labels}, {type(labels)}, {labels.shape}")
@@ -320,7 +357,7 @@ class Prediction(Resource):
                     updates=retrieved_metadata
                 )
                 
-                logging.debug(f"Updated Metadata: {updated_metadata}")
+                logging.debug(f"Updated Metadata: {updated_metadata}")  
 
                 success_payload = payload_formatter.construct_success_payload(
                     status=200,

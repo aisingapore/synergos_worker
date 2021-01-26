@@ -17,6 +17,7 @@ import os
 import random
 import subprocess
 import sys
+import threading
 import zipfile
 from collections import defaultdict, OrderedDict
 from glob import glob
@@ -29,6 +30,8 @@ from typing import Dict
 import numpy as np
 import psutil
 import torch as th
+from dotenv import load_dotenv
+from flask_caching import Cache
 
 ##################
 # Configurations #
@@ -41,6 +44,9 @@ infinite_nested_dict = lambda: defaultdict(infinite_nested_dict)
 SRC_DIR = Path(__file__).parent.absolute()
 
 API_VERSION = "0.1.0"
+
+# Load environment variables
+load_dotenv()
 
 ####################
 # Helper Functions #
@@ -172,7 +178,8 @@ CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
-CACHE = infinite_nested_dict()
+CACHE = Cache() #infinite_nested_dict()
+THREAD_CONDITION = threading.Condition()
 
 # Allocate no. of cores for processes
 CORES_USED = psutil.cpu_count(logical=True) - 1

@@ -481,6 +481,11 @@
         "exports"   : {"$ref": "#/definitions/exports"},
         "alignments": {"$ref": "#/definitions/alignments"},
 
+        "process": {
+            "description": "Process ID hosting Websocket worker",
+            "type": ["integer", "null"]
+        },
+
         "is_live": {
             "description": "Boolean switching tracking state of project",
             "type": "boolean"

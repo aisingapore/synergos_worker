@@ -124,7 +124,14 @@ class Payload:
             }
         )
 
-    def construct_success_payload(self, status, method, params, data):
+    def construct_success_payload(
+        self, 
+        status: int, 
+        method: str, 
+        params: dict, 
+        data: Union[list, dict], 
+        strict_format: bool = True
+    ):
         """ Automates the construction & formatting of a payload for a
             successful endpoint operation 
         Args:
@@ -132,6 +139,7 @@ class Payload:
             method (str): Endpoint operation invoked
             params (dict): Identifiers required to start endpoint operation
             data (list or dict): Data to be moulded into a response
+            strict_format (bool): Toggles strict adherence to archival format
         Returns:
             Formatted payload (dict)
         """
@@ -160,16 +168,29 @@ class Payload:
         if isinstance(data, list):
             formatted_data = []
             for record in data:
-                formatted_record = format_document(record, kind=self.subject)
+                formatted_record = (
+                    format_document(record, kind=self.subject) 
+                    if strict_format
+                    else record
+                )
                 formatted_data.append(formatted_record)
         else:
-            formatted_data = format_document(data, kind=self.subject)
+            formatted_data = (
+                format_document(data, kind=self.subject)
+                if strict_format
+                else data
+            )
                 
         self.__template['data'] = formatted_data
 
         jsonschema.validate(self.__template, schemas['payload_schema'])
 
         return self.__template      
+
+#######################################
+# MetaExtractor Class - MetaExtractor #
+#######################################
+
 
 #####################################
 # Base Data Storage Class - Records #

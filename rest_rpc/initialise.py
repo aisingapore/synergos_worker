@@ -7,12 +7,11 @@
 # Generic/Built-in
 import logging
 import os
-from pathlib import Path
 
 # Libs
 import jsonschema
 import numpy as np
-from flask import request
+from flask import request, session
 from flask_restx import Namespace, Resource, fields
 
 # Custom
@@ -34,6 +33,7 @@ ns_api = Namespace(
 )
 
 cache = app.config['CACHE']
+thread_condition = app.config['THREAD_CONDITION']
 
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
@@ -171,26 +171,26 @@ class Initialisation(Resource):
 
         if retrieved_metadata:
 
-            # Check that specified experiment run is not already running
-            if not cache[project_id]:
+            # global cache
+            # thread_condition.acquire()
 
-                # try:
+            # Check that specified experiment run is not already running
+            # if not cache.get(project_id):
+            if not os.getenv('process'):
+
                 project_cache_dir = os.path.join(
                     outdir_template.safe_substitute(project_id=project_id), 
                     "cache"
                 )
-                wssw_process, wss_worker = start_proc(
+                wssw_process = start_proc(
                     **request.json,
                     out_dir=project_cache_dir
                 )
                 wssw_process.start()
                 assert wssw_process.is_alive()
 
-                cache[project_id]['process'] = wssw_process
-                cache[project_id]['participant'] = wss_worker
-                
-                # except OSError:
-                #     pass
+                # cache.set(project_id,  wssw_process.ident)
+                os.environ['process'] = str(wssw_process.ident)
                 
                 # Created a resource        --> 201
                 status = 201
@@ -199,9 +199,12 @@ class Initialisation(Resource):
                 # Resource already exists   --> 200
                 status = 200
 
-            logging.info(f"Initialisation - Current state of Cache: {cache}")
+            logging.info(f"Initialisation - Current state of Cache: {cache.get_dict()}")
 
-            retrieved_metadata['is_live'] = cache[project_id]['process'].is_alive()
+            retrieved_metadata['is_live'] = cache.get(project_id) is not None
+            
+            # thread_condition.notify_all()
+            # thread_condition.release()
             
             expt_run_key = construct_combination_key(expt_id, run_id)
 

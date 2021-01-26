@@ -526,25 +526,27 @@ class Preprocessor(BasePipe):
         Returns:
             Interpolated Data (pd.DataFrame)
         """
-        if self.datatype == "tabular":
-            self.output = self.convert_to_safe_repr(self.data)
-            
-            uncertain_features = self.isolate_uncertain_features()
-            
-            for u_feat in uncertain_features:
-                interpolated_values = self.interpolate_feature(self.output, u_feat)
-                self.output[u_feat] = interpolated_values
+        if not self.is_processed():
+
+            if self.datatype == "tabular":
+                self.output = self.convert_to_safe_repr(self.data)
                 
-            self.output = self.revert_repr(self.output, self.schema)
-            self.output = self.output.astype(self.schema)
-            
-            if drop_duplicates:
-                self.output = self.output.drop_duplicates().reset_index(drop=True)
+                uncertain_features = self.isolate_uncertain_features()
+                
+                for u_feat in uncertain_features:
+                    interpolated_values = self.interpolate_feature(self.output, u_feat)
+                    self.output[u_feat] = interpolated_values
+                    
+                self.output = self.revert_repr(self.output, self.schema)
+                self.output = self.output.astype(self.schema)
+                
+                if drop_duplicates:
+                    self.output = self.output.drop_duplicates().reset_index(drop=True)
 
-            return self.output
+            else:
+                raise RuntimeError(f"Interpolation not supported for datatype '{self.datatype}'!")
 
-        else:
-            raise RuntimeError(f"Interpolation not supported for datatype '{self.datatype}'!")
+        return self.output
 
 
     def pad(self, drop_duplicates=True):
@@ -558,18 +560,20 @@ class Preprocessor(BasePipe):
         Returns:
             Padded Data (pd.DataFrame)
         """
-        if self.datatype == "image":
-            logging.debug(f"Preprocessor's input data: {self.data}")
-            self.output = self.pad_images(self.data)
-        
-        elif self.datatype == "text":
-            self.output = self.pad_texts(self.data)
+        if not self.is_processed():
 
-        else:
-            raise RuntimeError(f"Padding not supported for datatype '{self.datatype}'!")
+            if self.datatype == "image":
+                logging.debug(f"Preprocessor's input data: {self.data}")
+                self.output = self.pad_images(self.data)
+            
+            elif self.datatype == "text":
+                self.output = self.pad_texts(self.data)
 
-        if drop_duplicates:
-            self.output = self.output.drop_duplicates().reset_index(drop=True)
+            else:
+                raise RuntimeError(f"Padding not supported for datatype '{self.datatype}'!")
+
+            if drop_duplicates:
+                self.output = self.output.drop_duplicates().reset_index(drop=True)
 
         return self.output
         
@@ -581,15 +585,17 @@ class Preprocessor(BasePipe):
         Returns
             Output (pd.DataFrame) 
         """
-        if self.datatype == "tabular":
-            self.interpolate()
+        if not self.is_processed():
 
-        elif self.datatype in ["image", "text"]:
-            self.pad()
+            if self.datatype == "tabular":
+                self.interpolate()
 
-        else:
-            raise RuntimeError(f"Datatype '{self.datatype}' not supported!")
-        
+            elif self.datatype in ["image", "text"]:
+                self.pad()
+
+            else:
+                raise RuntimeError(f"Datatype '{self.datatype}' not supported!")
+            
         return self.output
 
 
@@ -693,25 +699,31 @@ class Preprocessor(BasePipe):
 
         elif action == 'classify':
             # When at least 2 class labels exists, condense via argmax if needed 
+            logging.debug(f"is_condensed and y.shape[1] >= 2: {is_condensed and y.shape[1] >= 2} {is_condensed} {y.shape[1] >= 2}")
             formatted_y = (
                 np.argmax(y, axis=1) 
                 if is_condensed and y.shape[1] >= 2 
                 else y
             )
+
             # Final shape of tensor is determined by the type of classification
             # performed. If binary classification, labels MUST exist as (N, 1).
             # However, for multiclass classification, labels MUST exists as (N,) 
-            if y.shape[1] <= 2: 
-                # Case 1: Binary classification
-                y_tensor = th.Tensor(formatted_y).reshape(shape=(-1, 1)).float()
+            if is_condensed:
+                if y.shape[1] <= 2: 
+                    # Case 1: Binary classification
+                    y_tensor = th.Tensor(formatted_y).reshape(shape=(-1, 1)).float()
+                else:
+                    # Case 2: Multiclass classification
+                    y_tensor = th.Tensor(formatted_y).long()
             else:
-                # Case 2: Multiclass classification
-                y_tensor = th.Tensor(formatted_y).long()
+                y_tensor = th.Tensor(formatted_y)
 
         else:
             raise ValueError(f"ML action {action} is not supported!")
 
-        logging.debug(f"Casted y_tensor: {y_tensor} {y_tensor.type()}")
+        logging.debug(f"Original y: {y} {y.shape}")
+        logging.debug(f"Casted y_tensor: {y_tensor} {y_tensor.shape} {y_tensor.type()}")
 
         return X_tensor, y_tensor, X_header, y_header
 

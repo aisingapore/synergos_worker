@@ -5,23 +5,17 @@
 ####################
 
 # Generic/Built-in
-import asyncio
 import binascii
-import json
 import logging
-import os
-from glob import glob
-from multiprocessing import Event, Process
-from pathlib import Path
+import signal
+import sys
 from typing import Dict, List, Tuple, Union
 
 # Libs
-import pandas as pd
 import syft as sy
 import torch as th
 from syft.generic.abstract.tensor import AbstractTensor
 from syft.workers.websocket_server import WebsocketServerWorker
-
 
 # Custom
 
@@ -169,3 +163,36 @@ class CustomServerWorker(WebsocketServerWorker):
 
             # send the response
             await websocket.send(response)
+
+
+    def signal_handler(self, signum, frame):
+
+        if self.loop.is_running():
+            self.loop.call_soon_threadsafe(self.loop.stop)
+
+        if not self.loop.is_closed():
+            self.loop.call_soon_threadsafe(self.loop.close)
+        
+        logging.info(f"WSSW internal Loop running: {self.loop.is_running()}")
+        logging.info(F"WSSW internal loop closed: {self.loop.is_closed()}")
+        logging.info("Websocket server stopped.")
+
+        self.remove_worker_from_local_worker_registry()
+        logging.info("Local worker registry resetted.")
+
+        # Zero is considered “successful termination” and any nonzero value is 
+        # considered “abnormal termination” by shells and the like.
+        sys.exit("Websocket Server worker successfully terminated.")
+    
+
+    def start(self):
+        """ Wrapper function around WSSW.start() to automate graceful 
+            termination of asynchroneous context
+        """
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
+
+        # Secure behavior: adds a secure layer applying cryptography and authentication
+        super().start()
+            
+            

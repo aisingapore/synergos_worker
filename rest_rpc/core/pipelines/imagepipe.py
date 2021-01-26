@@ -125,6 +125,8 @@ class ImagePipe(BasePipe):
         pix_map = pd.DataFrame(data=pix_vals, columns=pix_col_names)
         pix_map['target'] = img_class
 
+        logging.debug(f"Image on {img_path} has been loaded.")
+
         return pix_map
 
 
