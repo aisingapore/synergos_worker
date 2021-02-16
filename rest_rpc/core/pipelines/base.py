@@ -25,6 +25,9 @@ from tqdm import tqdm
 from rest_rpc.core.pipelines.abstract import AbstractPipe
 from rest_rpc.core.pipelines.dataset import Singleton, PipeData
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
@@ -32,6 +35,9 @@ from rest_rpc.core.pipelines.dataset import Singleton, PipeData
 HEADERFILE = "clean_engineered_headers.txt"
 DATAFILE = "clean_engineered_data.npy"
 SCHEMAFILE = "clean_engineered_schema.json"
+
+
+logging.info(f"base.py logged")
 
 ############################################
 # Data Preprocessing Base Class - BasePipe #
@@ -55,7 +61,7 @@ class BasePipe(AbstractPipe):
         self.data = data
         self.des_dir = des_dir
         self.output = self.load()
-        logging.debug(f"After initialisation, self.output: {self.output}")
+        #logging.notset(f"After initialisation, self.output: {self.output}")
 
     ############        
     # Checkers #
@@ -103,6 +109,7 @@ class BasePipe(AbstractPipe):
             schema (dict(str, str))
         """
         if not self.is_processed():
+            logging.error("Data must first be processed!", Class=BasePipe.__name__, function=BasePipe.parse_output.__name__)
             raise RuntimeError("Data must first be processed!")
         
         headers = self.output.columns.to_list()
@@ -164,15 +171,15 @@ class BasePipe(AbstractPipe):
             raise RuntimeError("Data must first be processed!")
         
         features = self.output.drop(columns=['target'])
-        logging.debug(f"Feature datatypes: {features.dtypes.to_dict()}")
+        logging.debug(f"Feature datatypes: {features.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
 
         if is_ohe:
             features = pd.get_dummies(features)
 
         if is_sorted:
             features = features.reindex(sorted(features.columns), axis=1)
-            logging.debug(f"Sorted features: {features.columns}")
-            logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}")
+            logging.debug(f"Sorted features: {features.columns}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
+            logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
 
         ###########################
         # Implementation Footnote #
@@ -217,7 +224,7 @@ class BasePipe(AbstractPipe):
         else:
             raise ValueError(f"ML action {action} is not supported!")
         
-        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}")
+        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
 
         if not is_condensed:
             targets = pd.get_dummies(targets) # no effect on regression values
@@ -282,6 +289,7 @@ class BasePipe(AbstractPipe):
             return converted_output
 
         else:
+            logging.error("Pipeline needs to be ran first!", Class=BasePipe.__name__, function=BasePipe.offload.__name__)
             raise RuntimeError("Pipeline needs to be ran first!")
 
 

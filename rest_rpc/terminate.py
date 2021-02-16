@@ -23,11 +23,13 @@ from rest_rpc import app
 from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.initialise import cache, init_output_model
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "terminate", 
@@ -36,6 +38,8 @@ ns_api = Namespace(
 
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
+
+logging.info(f"terminate.py logged", Description="Changes made")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -90,8 +94,8 @@ class Termination(Resource):
                 if wssw_process.is_alive():
                     wssw_process.terminate()    # end the process
                     wssw_process.join()         # reclaim resources from thread
-                    logging.info(f"Terminated process id: {wssw_process.pid}")
-                    logging.info(f"Terminated process exitcode: {wssw_process.exitcode}")
+                    logging.info(f"Terminated process id: {wssw_process.pid}", Class=Termination.__name__, function=Termination.post.__name__)
+                    logging.info(f"Terminated process exitcode: {wssw_process.exitcode}", Class=Termination.__name__, function=Termination.post.__name__)
                     assert not wssw_process.is_alive()
                     wssw_process.close()  
 
@@ -112,9 +116,12 @@ class Termination(Resource):
                 params=request.view_args,
                 data=updated_metadata
             )
+            logging.info(f"Successful payload", code="200", Class=Termination.__name__, function=Termination.post.__name__)
             return success_payload, 200
 
         else:
+            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Termination.__name__, function=Termination.post.__name__)
+
             ns_api.abort(
                 code=404, 
                 message=f"Project '{project_id}' has not been initialised! Please poll and try again."

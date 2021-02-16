@@ -9,6 +9,7 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple, Union
+import os
 
 # Libs
 import jsonschema
@@ -47,17 +48,20 @@ from rest_rpc.core.datetime_serialization import (
     TimeDeltaSerializer
 )
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 schemas = app.config['SCHEMAS']
 db_path = app.config['DB_PATH']
 payload_template = app.config['PAYLOAD_TEMPLATE']
 
 label_binarizer = LabelBinarizer()
+
+logging.info(f"utils.py logged")
 
 ####################
 # Helper Functions #
@@ -170,7 +174,7 @@ class Payload:
         self.__template['data'] = formatted_data
 
         jsonschema.validate(self.__template, schemas['payload_schema'])
-
+        logging.info(f"Operation was successful...")
         return self.__template      
 
 #####################################
@@ -629,6 +633,8 @@ class Benchmarker:
         R2 = r2_score(self.y_true, self.y_pred)
         MSE = mean_squared_error(self.y_true, self.y_pred)
         MAE = mean_absolute_error(self.y_true, self.y_pred)
+        # Log regressions stats
+        logging.debug(f"R2: {R2}, MSE: {MSE}, MAE: {MAE}", action="regress")
         return {'R2': R2, 'MSE': MSE, 'MAE': MAE}
 
 
@@ -687,9 +693,9 @@ class Benchmarker:
             ohe_y_pred = np.concatenate((1-self.y_pred, self.y_pred), axis=1)
             ohe_y_score = np.concatenate((1-self.y_score, self.y_score), axis=1)
 
-        logging.debug(f"OHE y_true: {ohe_y_true}")
-        logging.debug(f"OHE y_pred: {ohe_y_pred}")
-        logging.debug(f"OHE y_score: {ohe_y_score}")
+        #logging.notset(f"OHE y_true: {ohe_y_true}", function=_decode_ohe_dataset.__name__)
+        #logging.notset(f"OHE y_pred: {ohe_y_pred}", function=_decode_ohe_dataset.__name__)
+        #logging.notset(f"OHE y_score: {ohe_y_score}", function=_decode_ohe_dataset.__name__)
         return ohe_y_true, ohe_y_pred, ohe_y_score
 
     def reconstruct_dataset(self):
@@ -732,6 +738,7 @@ class Benchmarker:
             return self._analyse_classification()
 
         else:
+            logging.error(f"ML action {action} is not supported!")
             raise ValueError(f"ML action {action} is not supported!")
         
 

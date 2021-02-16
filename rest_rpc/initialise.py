@@ -22,11 +22,12 @@ from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.poll import tag_model, schema_model
 from rest_rpc.align import alignment_model
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "initialise", 
@@ -40,6 +41,8 @@ meta_records = MetaRecords(db_path=db_path)
 
 cache_template = app.config['CACHE_TEMPLATE']
 outdir_template = cache_template['out_dir']
+
+logging.info(f"initialize.py logged")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -175,6 +178,7 @@ class Initialisation(Resource):
             if not cache[project_id]:
 
                 # try:
+                logging.info(f"Initialising Project", Class=Initialisation.__name__, function=Initialisation.post.__name__)
                 project_cache_dir = os.path.join(
                     outdir_template.safe_substitute(project_id=project_id), 
                     "cache"
@@ -189,6 +193,8 @@ class Initialisation(Resource):
                 cache[project_id]['process'] = wssw_process
                 cache[project_id]['participant'] = wss_worker
                 
+                logging.info(f"Project initialised successfully, Project ID: {project_id}.", Class=Initialisation.__name__, function=Initialisation.post.__name__)
+                
                 # except OSError:
                 #     pass
                 
@@ -198,8 +204,9 @@ class Initialisation(Resource):
             else:
                 # Resource already exists   --> 200
                 status = 200
+            
+            logging.debug(f"Initialisation - Current state of Cache: {cache}", Class=Initialisation.__name__, function=Initialisation.post.__name__)
 
-            logging.info(f"Initialisation - Current state of Cache: {cache}")
 
             retrieved_metadata['is_live'] = cache[project_id]['process'].is_alive()
             
@@ -222,9 +229,11 @@ class Initialisation(Resource):
                 params=request.view_args,
                 data=updated_metadata
             )
+            logging.info(f"Sucessful Payload", Class=Initialisation.__name__, function=Initialisation.post.__name__)
             return success_payload, status
     
         else:
+            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Initialisation.__name__, function=Initialisation.post.__name__)
             ns_api.abort(
                 code=404, 
                 message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."

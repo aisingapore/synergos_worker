@@ -24,12 +24,12 @@ from syft.workers.websocket_server import WebsocketServerWorker
 
 
 # Custom
+# Synergos logging
+from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 hook = sy.TorchHook(th, is_client=False)
 
@@ -147,7 +147,7 @@ class CustomServerWorker(WebsocketServerWorker):
         """
         while True:
 
-            logging.debug(f"Cummulated messages: {self.broadcast_queue}")
+            # logging.debug(f"Cummulated messages: {self.broadcast_queue}")
 
             # get a message from the queue
             message = await self.broadcast_queue.get()

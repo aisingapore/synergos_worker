@@ -18,11 +18,13 @@ from rest_rpc import app
 from rest_rpc.core.utils import Payload, MetaRecords
 from rest_rpc.poll import poll_input_model
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "align", 
@@ -31,6 +33,8 @@ ns_api = Namespace(
 
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
+
+logging.info(f"align.py logged")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -153,15 +157,18 @@ class Alignment(Resource):
                     params=request.view_args,
                     data=updated_metadata
                 )
+                logging.info(f"Successful payload", status="200", Class=Alignment.__name__, function=Alignment.post.__name__)
                 return success_payload, 200
 
             except KeyError:
+                logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Alignment.__name__, function=Alignment.post.__name__)
                 ns_api.abort(
                     code=404, 
                     message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."
                 )  
 
         else:
+            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Alignment.__name__, function=Alignment.post.__name__)
             ns_api.abort(
                 code=404, 
                 message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."

@@ -20,11 +20,12 @@ from rest_rpc import app
 from rest_rpc.core.server import load_and_combine
 from rest_rpc.core.utils import Payload, MetaRecords
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
-
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 ns_api = Namespace(
     "poll", 
@@ -41,6 +42,8 @@ outdir_template = cache_template['out_dir']
 X_template = cache_template['X']
 y_template = cache_template['y']
 df_template = cache_template['dataframe']
+
+logging.info(f"poll.py logged", Description="No Changes")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -239,8 +242,8 @@ class Poll(Resource):
                         is_condensed=False
                     )
 
-                    logging.debug(f"Polled X_header: {X_header}")
-                    logging.debug(f"Polled y_header: {y_header}")
+                    logging.debug(f"Polled X_header: {X_header}", Class=Poll.__name__, function=Poll.post.__name__)
+                    logging.debug(f"Polled y_header: {y_header}", Class=Poll.__name__, function=Poll.post.__name__)
 
                     # Export X & y tensors for subsequent use
                     X_export_path = X_template.safe_substitute(sub_keys)
@@ -263,7 +266,7 @@ class Poll(Resource):
                     headers[meta] = {'X': X_header, 'y': y_header}
                     schemas[meta] = schema
 
-                    logging.debug(f"Exports: {exports}")
+                    logging.debug(f"Exports: {exports}", Class=Poll.__name__, function=Poll.post.__name__)
 
 
             meta_records.update(

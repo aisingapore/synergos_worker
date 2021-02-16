@@ -31,6 +31,9 @@ from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
 ##################
 # Configurations #
 ##################
@@ -38,6 +41,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 BUFFER_FEATURE = "B" + "_"*5 + "#" # entirely arbitrarily chosen
 
 cores_used = app.config['CORES_USED']
+
+logging.info("preprocessor.py logged")
 
 ######################################################
 # Data Preprocessing Class - Iterative Interpolation #
@@ -361,13 +366,13 @@ class Preprocessor(BasePipe):
         Returns:
             Augmented dataset (th.Tensor)
         """
-        logging.debug(f"Alignment indexes: {alignment_idxs}")
+        logging.debug(f"Alignment indexes: {alignment_idxs}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
 
         aligned_dataset = dataset.copy()
         for idx in alignment_idxs:
 
-            logging.debug(f"Current spacer index: {idx}")
-            logging.debug(f"Before augmentation: size is {aligned_dataset.shape}")
+            logging.debug(f"Current spacer index: {idx}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
+            logging.debug(f"Before augmentation: size is {aligned_dataset.shape}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
 
             if self.datatype == "image":
                 pix_pad, _, _ = self.extract_image_metadata()
@@ -382,7 +387,7 @@ class Preprocessor(BasePipe):
                 axis=1
             )
 
-            logging.debug(f"After augmentation: size is {aligned_dataset.shape}")
+            logging.debug(f"After augmentation: size is {aligned_dataset.shape}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
         
         return aligned_dataset
 
@@ -436,8 +441,8 @@ class Preprocessor(BasePipe):
             is_condensed=is_condensed
         )
 
-        logging.debug(f"Transformed default X headers: {X_header} {len(X_header)}")
-        logging.debug(f"Transformed default y headers: {y_header} {len(y_header)}")
+        logging.debug(f"Transformed default X headers: {X_header} {len(X_header)}", Class=Preprocessor.__name__, function=Preprocessor.transform_defaults.__name__)
+        logging.debug(f"Transformed default y headers: {y_header} {len(y_header)}", Class=Preprocessor.__name__, function=Preprocessor.transform_defaults.__name__)
 
         if X_alignments:
             X = self.align_dataset(X, X_alignments)
@@ -493,7 +498,7 @@ class Preprocessor(BasePipe):
             X_header = self.align_header(X_header, X_alignments)
 
         formatted_X = formatted_X.reshape((data_count, -1, height, width))
-        logging.debug(f"Formatted_X: {formatted_X}")
+        #logging.notset(f"Formatted_X: {formatted_X}", Class=Preprocessor.__name__, function=Preprocessor.transform_images.__name__)
 
         if y_alignments:
             y = self.align_dataset(y, y_alignments)
@@ -549,7 +554,7 @@ class Preprocessor(BasePipe):
             Padded Data (pd.DataFrame)
         """
         if self.datatype == "image":
-            logging.debug(f"Preprocessor's input data: {self.data}")
+            logging.debug(f"Preprocessor's input data: {self.data}", Class=Preprocessor.__name__, function=Preprocessor.pad.__name__)
             self.output = self.pad_images(self.data)
         
         elif self.datatype == "text":
@@ -701,7 +706,7 @@ class Preprocessor(BasePipe):
         else:
             raise ValueError(f"ML action {action} is not supported!")
 
-        logging.debug(f"Casted y_tensor: {y_tensor} {y_tensor.type()}")
+        #logging.notset(f"Casted y_tensor: {y_tensor} {y_tensor.type()}", Class=Preprocessor.__name__, function=Preprocessor.transform.__name__)
 
         return X_tensor, y_tensor, X_header, y_header
 

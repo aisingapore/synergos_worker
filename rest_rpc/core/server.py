@@ -33,11 +33,15 @@ from rest_rpc.core.pipelines import (
 )
 from rest_rpc.core.custom import CustomServerWorker
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
+
 ##################
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
+# logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 # Avoid Pytorch deadlock issues
 th.set_num_threads(1)
@@ -50,6 +54,9 @@ hook.local_worker.is_client_worker = False
 src_dir = app.config['SRC_DIR']
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
+
+logging.info(f"server.py logged")
+
 
 #############
 # Functions #
@@ -80,7 +87,7 @@ def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
     """
     # Searches the data directory for all metadata specifications
     all_metadata_paths = list(Path(data_dir).glob("**/metadata.json"))
-    logging.debug(f"all_metadata_paths: {all_metadata_paths}")
+    logging.debug(f"all_metadata_paths: {all_metadata_paths}", function=detect_metadata.__name__)
     for meta_path in all_metadata_paths:
 
         if set(tag).issubset(set(meta_path.parts)):
@@ -94,6 +101,7 @@ def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
             # once target metadata set is found
             return core_dir, metadata
 
+    logging.error(f"Unable to detect core directory under tag '{tag}'!", function=detect_metadata.__name__)
     raise RuntimeError(f"Unable to detect core directory under tag '{tag}'!")
 
 
@@ -139,6 +147,7 @@ def load_tabulars(tab_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         return tab_pipeline.offload()
 
     else:
+        logging.error("No valid tabular datasets were detected!", function=detect_metadata.__name__)
         raise RuntimeError("No valid tabular datasets were detected!")
 
 
@@ -189,6 +198,7 @@ def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         return img_pipeline.offload()
 
     else:
+        logging.error("No valid image datasets were detected!", function=detect_metadata.__name__)
         raise RuntimeError("No valid image datasets were detected!")
 
 
@@ -229,6 +239,7 @@ def load_texts(txt_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         return text_pipeline.offload()
 
     else:
+        logging.error("No valid corpora were detected!", function=load_texts.__name__)
         raise RuntimeError("No valid corpora were detected!")
 
 
@@ -261,12 +272,14 @@ def load_dataset(tag, out_dir=out_dir):
         elif datatype == "text":
             loaded_data = load_texts(core_dir, metadata, caching_dir)
         else:
+            logging.error(f"Specified Datatype {datatype} is not supported!", function=load_texts.__name__)
             raise ValueError(f"Specified Datatype {datatype} is not supported!")
 
-        logging.debug(f"Loaded tag data: {loaded_data}")
+        #logging.notset(f"Loaded tag data: {loaded_data}", function=load_texts.__name__)
         return loaded_data
 
     else:
+        logging.error("No valid datasets were detected!", function=load_texts.__name__)
         raise RuntimeError("No valid datasets were detected!")
 
 
@@ -307,7 +320,7 @@ def load_and_combine(
         for tag in tags
     ])
 
-    logging.debug(f"unified piped data: {unified_pipedata.data}")
+    #logging.notset(f"unified piped data: {unified_pipedata.data}", function=load_and_combine.__name__)
 
     # For now, assume that a participant will only declare 1 type of data per 
     # project. This will be revised in future to handle multiple datatype 
@@ -316,9 +329,9 @@ def load_and_combine(
     combined_data = unified_pipedata.compute()
     for datatype, data in combined_data.items():
 
-        logging.debug(f"Data size: {len(data.columns)}")
-        logging.debug(f"Data columns: {data.columns}")
-        logging.debug(f"Data: {data}")
+        logging.debug(f"Data size: {len(data.columns)}", function=load_and_combine.__name__)
+        logging.debug(f"Data columns: {data.columns}", function=load_and_combine.__name__)
+        #logging.notset(f"Data: {data}", function=load_and_combine.__name__)
 
         preprocessor = Preprocessor(
             datatype=datatype, 
@@ -327,7 +340,7 @@ def load_and_combine(
         )
         preprocessor.run()
 
-        logging.debug(f"Interpolated combined data: {preprocessor.output} {preprocessor.output.shape}")
+        #logging.notset(f"Interpolated combined data: {preprocessor.output} {preprocessor.output.shape}", function=load_and_combine.__name__)
 
         (
             X_combined_tensor, 
@@ -343,8 +356,8 @@ def load_and_combine(
 
         # preprocessor.offload()
 
-        logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}")
-        logging.debug(f"y_combined_header: {y_combined_header} {len(y_combined_header)}")
+        logging.debug(f"X_combined_header: {X_combined_header} {len(X_combined_header)}", function=load_and_combine.__name__)
+        logging.debug(f"y_combined_header: {y_combined_header} {len(y_combined_header)}", function=load_and_combine.__name__)
 
         return (
             X_combined_tensor, 
@@ -445,7 +458,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
 
             feature_alignment = all_alignments[meta]['X']
             target_alignment = all_alignments[meta]['y']
-            logging.debug(f"Start process - feature alignment indexes: {feature_alignment}")
+            logging.debug(f"Start process - feature alignment indexes: {feature_alignment}", function=start_proc.__name__)
         
             X_aligned, y_aligned, _, _, _, _ = load_and_combine(
                 action=action,
@@ -456,8 +469,8 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
                 out_dir=out_dir
             )
             
-            logging.debug(f"Start process - X shape: {X_aligned.shape} {X_aligned.type()}")
-            logging.debug(f"Start process - y shape: {y_aligned.shape} {y_aligned.type()}")
+            logging.debug(f"Start process - X shape: {X_aligned.shape} {X_aligned.type()}", function=start_proc.__name__)
+            logging.debug(f"Start process - y shape: {y_aligned.shape} {y_aligned.type()}", function=start_proc.__name__)
 
             X_aligned_annotated, y_aligned_annotated = annotate(
                 X=X_aligned, 
@@ -471,13 +484,13 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
 
             final_datasets += (X_aligned_annotated, y_aligned_annotated)
 
-            logging.debug(f"Loaded {meta} data: {X_aligned_annotated, y_aligned_annotated}")
+            #logging.notset(f"Loaded {meta} data: {X_aligned_annotated, y_aligned_annotated}", function=start_proc.__name__)
 
     kwargs['data'] = final_datasets  #[X, y]
     logging.info(f"Worker metadata: {kwargs}")
 
-    logging.debug(f"Before participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}")
-    logging.debug(f"Before participant initialisation - Registered workers in env : {sy.local_worker._known_workers}")
+    logging.debug(f"Before participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}", function=start_proc.__name__)
+    logging.debug(f"Before participant initialisation - Registered workers in env : {sy.local_worker._known_workers}", function=start_proc.__name__)
 
     # Originally, the WSS worker could function properly without mentioning
     # a specific event loop. However, that's because it was ran as the main
@@ -491,7 +504,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
     # Note: `auto_add=False` is necessary here because we want the WSSW object
     #       to get automatically garbage collected once it is no longer used.
     kwargs.update({'loop': loop})
-    logging.debug(f"WSSW's kwargs: {kwargs}")
+    logging.debug(f"WSSW's kwargs: {kwargs}", function=start_proc.__name__)
 
     server = participant(hook=hook, **kwargs)
     # server.broadcast_queue = asyncio.Queue(loop=loop)
@@ -502,8 +515,8 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
     # daemonic child processes.
     p.daemon = True
 
-    logging.debug(f"After participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}")
-    logging.debug(f"After participant initialisation - Registered workers in env : {sy.local_worker._known_workers}")
+    logging.debug(f"After participant initialisation - Registered workers in grid: {hook.local_worker._known_workers}", function=start_proc.__name__)
+    logging.debug(f"After participant initialisation - Registered workers in env : {sy.local_worker._known_workers}", function=start_proc.__name__)
 
     return p, server
 

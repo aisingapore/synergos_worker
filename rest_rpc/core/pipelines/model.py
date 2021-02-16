@@ -10,19 +10,26 @@ import inspect
 import logging
 from collections import OrderedDict
 from typing import Tuple
+import os
 
 # Libs
 import torch as th
 from torch import nn
 
+# Synergos logging
+from SynergosLogger.init_logging import logging
+
+
 ##################
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
+#logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 MODULE_OF_LAYERS = "torch.nn"
 MODULE_OF_ACTIVATIONS = "torch.nn.functional"
+
+logging.info(f"model.py logged")
 
 ###################################
 # Model Abstraction Class - Model #
@@ -133,7 +140,7 @@ class Model(nn.Module):
             return layer
 
         except AttributeError:
-            logging.error(f"Specified layer type '{layer_type}' is not supported!")
+            logging.error(f"Specified layer type '{layer_type}' is not supported!", Class=Model.__name__, function=Model.__parse_layer_type.__name__)
 
 
     @staticmethod
@@ -151,7 +158,7 @@ class Model(nn.Module):
             return activation
 
         except AttributeError:
-            logging.error(f"Specified activation type '{activation_type}' is not supported!")
+            logging.error(f"Specified activation type '{activation_type}' is not supported!", Class=Model.__name__, function=Model.__parse_activation_type.__name__)
 
     ##################
     # Core Functions #
