@@ -121,8 +121,9 @@ class Initialisation(Resource):
             4) Logging toggle
             5) Verbosity
             6) Machine learning action to be executed
-            6) Tags
-            7) Alignments
+            7) Connections
+            8) Tags
+            9) Alignments
 
             eg.
 
@@ -133,6 +134,18 @@ class Initialisation(Resource):
                 "log_msgs": true,
                 "verbose": true,
                 "action": "classify",
+                "connections": {
+                    'logs': {
+                        'host': "172.18.0.4",
+                        'port': 5000,
+                        'configurations': {
+                            name: "test_participant_1",
+                            logging_level: 20,
+                            logging_variant: "graylog",
+                            debugging_fields: False,
+                        }
+                    }
+                },
                 "tags": {
                     "train": [["type_a","v2"], ["type_b","v3"]],
                     "evaluate": [["type_c", "v1"]]

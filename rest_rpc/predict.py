@@ -184,13 +184,27 @@ class Prediction(Resource):
             involved post-alignment.  
 
             JSON received will contain the following information:
-            1) Inference (dict(str, dict(str, list(List(str)))) where
+            1) Machine learning action to be executed
+            2) Connections
+            3) Inference (dict(str, dict(str, list(List(str)))) where
                list(list(str) is the string representation of a numpy array) 
-
+            
             eg.
 
             {
                 "action": "classify",
+                "connections": {
+                    'logs': {
+                        'host': "172.18.0.4",
+                        'port': 5000,
+                        'configurations': {
+                            name: "test_participant_1",
+                            logging_level: 20,
+                            logging_variant: "graylog",
+                            debugging_fields: False,
+                        }
+                    }
+                },
                 "inferences": {
                     "train": {},
                     "evaluate": {

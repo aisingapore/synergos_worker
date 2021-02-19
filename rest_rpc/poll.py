@@ -7,10 +7,8 @@
 # Generic/Built-in
 import logging
 import os
-from pathlib import Path
 
 # Libs
-import jsonschema
 import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
@@ -19,6 +17,7 @@ from flask_restx import Namespace, Resource, fields
 from rest_rpc import app
 from rest_rpc.core.server import load_and_combine
 from rest_rpc.core.utils import Payload, MetaRecords
+from synlogger import WorkerLogger, SysmetricLogger
 
 # Synergos logging
 from SynergosLogger.init_logging import logging
@@ -151,12 +150,25 @@ class Poll(Resource):
 
             JSON received will contain the following information:
             1) Action (i.e. 'regress', 'classify', 'cluster', 'associate')
-            2) Data tags
+            2) Connections
+            3) Data tags
 
             eg. 
 
             {
-                "action": 'classify'
+                "action": 'classify',
+                "connections": {
+                    'logs': {
+                        'host': "172.18.0.4",
+                        'port': 5000,
+                        'configurations': {
+                            name: "test_participant_1",
+                            logging_level: 20,
+                            logging_variant: "graylog",
+                            debugging_fields: False,
+                        }
+                    }
+                },
                 "tags": {
                     "train": [["type_a","v1"], ["type_b","v2"]],
                     "evaluate": [["type_c","v3"]]

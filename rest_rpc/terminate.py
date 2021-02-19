@@ -64,6 +64,26 @@ class Termination(Resource):
     def post(self, project_id, expt_id, run_id):
         """ Closes WebsocketServerWorker to prevent potential cyber attacks during
             times of inactivity
+
+            JSON received will contain the following information:
+            1) Connections
+
+            eg.
+
+            {
+                "connections": {
+                    'logs': {
+                        'host': "172.18.0.4",
+                        'port': 5000,
+                        'configurations': {
+                            name: "test_participant_1",
+                            logging_level: 20,
+                            logging_variant: "graylog",
+                            debugging_fields: False,
+                        }
+                    }
+                }
+            }
         """
         expt_run_key = construct_combination_key(expt_id, run_id)
 

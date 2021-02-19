@@ -57,7 +57,6 @@ out_dir = app.config['OUT_DIR']
 
 logging.info(f"server.py logged")
 
-
 #############
 # Functions #
 #############

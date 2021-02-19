@@ -66,16 +66,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git\
     pciutils
 
-COPY requirements.txt ./
+ADD . /worker
+WORKDIR /worker
 
 RUN pip install --upgrade pip setuptools wheel \
  && pip install --no-cache-dir -r requirements.txt
 
-ADD . /worker
-WORKDIR /worker
-
-RUN pip install -r synergos_logger/requirements.txt
-RUN pip install synergos_logger/
+RUN pip install synergos_logger
 
 EXPOSE 5000
 EXPOSE 8020

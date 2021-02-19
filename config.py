@@ -21,8 +21,8 @@ import zipfile
 from collections import defaultdict, OrderedDict
 from glob import glob
 from multiprocessing import Manager
-from string import Template
 from pathlib import Path
+from string import Template
 from typing import Dict
 
 # Libs
@@ -30,17 +30,18 @@ import numpy as np
 import psutil
 import torch as th
 
+# Custom
+from synlogger.general import WorkerLogger, SysmetricLogger
+
 ##################
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
-
-infinite_nested_dict = lambda: defaultdict(infinite_nested_dict)
-
 SRC_DIR = Path(__file__).parent.absolute()
 
 API_VERSION = "0.1.0"
+
+infinite_nested_dict = lambda: defaultdict(infinite_nested_dict)
 
 ####################
 # Helper Functions #
@@ -143,9 +144,9 @@ def install(package: str) -> bool:
     except:
         return False
 
-################################################
-# PySyft Worker Container Local Configurations #
-################################################
+##################################################
+# Synergos Worker Container Local Configurations #
+##################################################
 """ 
 General parameters required for processing inputs & outputs
 """
@@ -189,23 +190,24 @@ logging.debug(f"Cache initialised: {CACHE}")
 logging.debug(f"No. of available CPU Cores: {CORES_USED}")
 logging.debug(f"No. of available GPUs: {GPU_COUNT}")
 
-#########################################
-# PySyft Worker Database Configurations #
-#########################################
+###########################################
+# Synergos Worker Database Configurations #
+###########################################
 """ 
-In PySyft worker, the database is used mainly for caching results of operations
-triggered by the TTP's REST-RPC calls
+In Synergos Worker, the database is used mainly for caching results of 
+operations triggered by the TTP's REST-RPC calls
 """
 DB_PATH = os.path.join(SRC_DIR, "outputs", "operations.json")
 
 logging.debug(f"Database path detected: {DB_PATH}")
 
-##################################
-# PySyft Worker Template Schemas #
-##################################
+####################################
+# Synergos Worker Template Schemas #
+####################################
 """
-For REST service to be stable, there must be schemas enforced to ensure that any
-erroneous queries will affect the functions of the system.
+For REST service to be stable, there must be schemas enforced to ensure that 
+any erroneous queries will be rejected immediately, anf ultimately, not affect 
+the functions of the system.
 """
 template_paths = detect_configurations("templates")
 
@@ -216,9 +218,9 @@ for name, s_path in template_paths.items():
 
 logging.debug(f"Schemas loaded: {list(SCHEMAS.keys())}")
 
-#######################################
-# PySyft Worker Export Configurations #
-####################################### 
+######################################### 
+# Synergos Worker Export Configurations #
+######################################### 
 """
 Certain Flask requests sent from the TTP (namely `/poll` and `/predict`) will
 trigger file exports to the local machine, while other requests 
@@ -253,12 +255,12 @@ PREDICT_TEMPLATE = {
     'statistics': Template(stats_outpath)
 }
 
-#######################################
-# PySyft Flask Payload Configurations #
-####################################### 
+###############################################
+# Synergos Worker REST Payload Configurations #
+###############################################
 """
-Responses for REST-RPC have a specific format to allow compatibility between TTP
-& Worker Flask Interfaces. Remember to modify rest_rpc.connection.core.utils.Payload 
+Responses for REST-RPC have a specific format to allow compatibility between 
+TTP & Worker Flask Interfaces. Remember to modify rest_rpc.connection.core.utils.Payload 
 upon modifying this template!
 """
 PAYLOAD_TEMPLATE = {
@@ -270,10 +272,26 @@ PAYLOAD_TEMPLATE = {
     'data': {}
 }
 
-############################
-# REST-RPC Language Models #
-############################
+##########################################
+# Synergos Worker Logging Configurations #
+##########################################
+"""
+Synergos has certain optional components, such as a centrialised logging 
+server, as well as a metadata catalogue. This section governs configuration of 
+the worker node to facilitate such integrations, where applicable. 
+"""
+NODE_LOGGER = logging
 
+SYSMETRIC_LOGGER = logging
+
+##################################################
+# Synergos Worker Language Models Configurations #
+##################################################
+"""
+NLP pipelines in Synergos are flexible in that different backends are 
+supported. Users are free to mount language sources/dependencies for their
+desired backends (should it be supported).
+"""
 # Install language models for Spacy
 spacy_src_dir = Path(os.path.join(CUSTOM_DIR, 'spacy'))
 spacy_sources = list(spacy_src_dir.glob('**/*.tar.gz'))

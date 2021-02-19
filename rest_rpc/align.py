@@ -113,12 +113,25 @@ class Alignment(Resource):
             involved post-alignment.  
 
             JSON received will contain the following information:
-            1) Data tags
-            2) Indexes to insert null representation of columns on
+            1) Connections
+            2) Data tags
+            3) Indexes to insert null representation of columns on
 
             eg. 
 
             {
+                "connections": {
+                    'logs': {
+                        'host': "172.18.0.4",
+                        'port': 5000,
+                        'configurations': {
+                            name: "test_participant_1",
+                            logging_level: 20,
+                            logging_variant: "graylog",
+                            debugging_fields: False,
+                        }
+                    }
+                },
                 "tags": {
                     "train": [["type_a","v1"], ["type_b","v2"]],
                     "evaluate": [["type_c","v3"]]

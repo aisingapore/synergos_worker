@@ -7,6 +7,7 @@
 # Generic/Built-in
 import argparse
 import logging
+import uuid
 
 # Libs
 
@@ -18,7 +19,7 @@ from rest_rpc import app
 # Configurations #
 ##################
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
+
 
 ###########
 # Scripts #
@@ -26,15 +27,25 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 if __name__ == "__main__":
 
-    app.run(host="0.0.0.0", port=5000)
-
-
-##############
-# Deprecated #
-##############
-"""
     parser = argparse.ArgumentParser(
-        description="REST orchestrator for Worker Node."
+        description="REST-RPC Receiver for a Synergos Network."
+    )
+
+    parser.add_argument(
+        "--id",
+        "-i",
+        type=str,
+        default=f"WRK_{uuid.uuid4}",
+        help="ID of worker, e.g. --id Alice"
+    )
+
+    parser.add_argument(
+        "--logging_variant",
+        "-l",
+        type=str,
+        choices=["basic", "graylog"],
+        default="basic",
+        help="ID of worker, e.g. --id Alice"
     )
 
     parser.add_argument(
@@ -42,14 +53,26 @@ if __name__ == "__main__":
         "-i",
         type=str,
         required=True,
-        help="Name (id) of the websocket server worker, e.g. --id Alice"
+        help="ID of worker, e.g. --id Alice"
+    )
+    
+    parser.add_argument(
+        '--debug',
+        "-d",
+        action='store_true',
+        default=False,
+        help="Toggles debugging mode on this worker node"
     )
 
     kwargs = vars(parser.parse_args())
     logging.info(f"Worker Parameters: {kwargs}")
 
-    with database as db:
+    app.run(host="0.0.0.0", port=5000)
 
-        cache_table = db.table('Cache')
-        cache_table.insert(kwargs)
+
+
+##############
+# Deprecated #
+##############
+"""
 """

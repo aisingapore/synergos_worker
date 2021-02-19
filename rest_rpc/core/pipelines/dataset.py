@@ -8,18 +8,16 @@
 import concurrent.futures
 import json
 import logging
-import math
-import os
-import re
-from pathlib import Path
 from typing import Dict, List, Union
 
 # Libs
 import numpy as np
 import pandas as pd
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
+# # Synergos logging
+# from SynergosLogger.init_logging import logging
+# Custom
+from config import NODE_LOGGER
 
 ##################
 # Configurations #
