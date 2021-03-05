@@ -5,7 +5,6 @@
 ####################
 
 # Generic/Built-in
-import logging
 import os
 import random
 from pathlib import Path
@@ -31,9 +30,6 @@ from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
 ##################
 # Configurations #
 ##################
@@ -42,7 +38,8 @@ BUFFER_FEATURE = "B" + "_"*5 + "#" # entirely arbitrarily chosen
 
 cores_used = app.config['CORES_USED']
 
-logging.info("preprocessor.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("preprocessor.py logged", Description="No Changes")
 
 ######################################################
 # Data Preprocessing Class - Iterative Interpolation #

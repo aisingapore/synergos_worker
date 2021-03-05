@@ -14,16 +14,15 @@ from typing import Dict, List, Union
 import numpy as np
 import pandas as pd
 
-# # Synergos logging
-# from SynergosLogger.init_logging import logging
 # Custom
-from config import NODE_LOGGER
+from rest_rpc import app
 
 ##################
 # Configurations #
 ##################
 
-logging.info(f"dataset.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("dataset.py logged", Description="No Changes")
 
 ######################################
 # Data Abstraction Class - Singleton #

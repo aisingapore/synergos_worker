@@ -8,7 +8,6 @@
 import asyncio
 import binascii
 import json
-import logging
 import os
 from glob import glob
 from multiprocessing import Event, Process
@@ -22,16 +21,17 @@ import torch as th
 from syft.generic.abstract.tensor import AbstractTensor
 from syft.workers.websocket_server import WebsocketServerWorker
 
-
 # Custom
-# Synergos logging
-from SynergosLogger.init_logging import logging
+from rest_rpc import app
 
 ##################
 # Configurations #
 ##################
 
 hook = sy.TorchHook(th, is_client=False)
+
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("custom.py logged", Description="No Changes")
 
 ###########################################
 # Custom Async Class - CustomServerWorker #

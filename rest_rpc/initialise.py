@@ -5,7 +5,6 @@
 ####################
 
 # Generic/Built-in
-import logging
 import os
 from pathlib import Path
 
@@ -21,9 +20,6 @@ from rest_rpc.core.server import start_proc
 from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
 from rest_rpc.poll import tag_model, schema_model
 from rest_rpc.align import alignment_model
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
@@ -42,7 +38,8 @@ meta_records = MetaRecords(db_path=db_path)
 cache_template = app.config['CACHE_TEMPLATE']
 outdir_template = cache_template['out_dir']
 
-logging.info(f"initialize.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("initialise.py logged", Description="No Changes")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #

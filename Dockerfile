@@ -72,7 +72,7 @@ WORKDIR /worker
 RUN pip install --upgrade pip setuptools wheel \
  && pip install --no-cache-dir -r requirements.txt
 
-RUN pip install synergos_logger
+RUN pip install ./synergos_logger
 
 EXPOSE 5000
 EXPOSE 8020

@@ -7,7 +7,6 @@
 # Generic/Built-in
 import concurrent.futures
 import json
-import logging
 import os
 from pathlib import Path
 from typing import List
@@ -26,17 +25,14 @@ from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.preprocessor import Preprocessor
 from rest_rpc.core.pipelines.dataset import PipeData
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
-
 ##################
 # Configurations #
 ##################
 
 cores_used = app.config['CORES_USED']
 
-logging.info(f"tabularpipe.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("tabularpipe.py logged", Description="No Changes")
 
 ##########################################
 # Data Preprocessing Class - TabularPipe #

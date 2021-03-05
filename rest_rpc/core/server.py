@@ -8,7 +8,6 @@
 import argparse
 import asyncio
 import json
-import logging
 import os
 import shlex
 import subprocess
@@ -33,15 +32,9 @@ from rest_rpc.core.pipelines import (
 )
 from rest_rpc.core.custom import CustomServerWorker
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
-
 ##################
 # Configurations #
 ##################
-
-# logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 # Avoid Pytorch deadlock issues
 th.set_num_threads(1)
@@ -55,7 +48,8 @@ src_dir = app.config['SRC_DIR']
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
 
-logging.info(f"server.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("server.py logged", Description="No Changes")
 
 #############
 # Functions #

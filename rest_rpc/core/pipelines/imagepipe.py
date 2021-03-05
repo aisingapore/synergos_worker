@@ -6,7 +6,6 @@
 
 # Generic/Built-in
 import concurrent.futures
-import logging
 import os
 from pathlib import Path
 from string import Template
@@ -19,6 +18,7 @@ from PIL import Image
 from sklearn.preprocessing import LabelEncoder
 
 # Custom
+from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
 
@@ -26,6 +26,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 # Configurations #
 ##################
 
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("imagepipe.py logged", Description="No Changes")
 
 ########################################
 # Data Preprocessing Class - ImagePipe #

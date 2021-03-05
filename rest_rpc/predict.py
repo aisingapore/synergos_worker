@@ -4,7 +4,6 @@
 
 # Generic/Built-in
 import json
-import logging
 import os
 from pathlib import Path
 
@@ -24,9 +23,6 @@ from rest_rpc.core.utils import (
 )
 from rest_rpc.initialise import cache
 from rest_rpc.align import alignment_model
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
@@ -48,7 +44,8 @@ y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
 
-logging.info(f"predict.py logged", Description="Changes made")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("predict.py logged", Description="No Changes")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #

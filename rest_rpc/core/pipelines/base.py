@@ -6,7 +6,6 @@
 
 # Generic/Built-in
 import json
-import logging
 import os
 from pathlib import Path
 from typing import Dict, List, Tuple, Callable
@@ -20,11 +19,9 @@ from sklearn.preprocessing import minmax_scale, MinMaxScaler
 from tqdm import tqdm
 
 # Custom
+from rest_rpc import app
 from rest_rpc.core.pipelines.abstract import AbstractPipe
 from rest_rpc.core.pipelines.dataset import Singleton, PipeData
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
@@ -34,7 +31,8 @@ HEADERFILE = "clean_engineered_headers.txt"
 DATAFILE = "clean_engineered_data.npy"
 SCHEMAFILE = "clean_engineered_schema.json"
 
-logging.info(f"base.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("base.py logged", Description="No Changes")
 
 ############################################
 # Data Preprocessing Base Class - BasePipe #

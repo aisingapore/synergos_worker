@@ -6,7 +6,6 @@
 
 # Generic/Built-in
 import concurrent.futures
-import logging
 import math
 import os
 import re
@@ -33,10 +32,6 @@ from tqdm import tqdm
 from rest_rpc import app
 from rest_rpc.core.pipelines.base import BasePipe
 from rest_rpc.core.pipelines.dataset import PipeData
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
 
 ##################
 # Configurations #
@@ -67,7 +62,8 @@ cores_used = app.config['CORES_USED']
 
 SEED = 42
 
-logging.info(f"textpipe.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("custom.py logged", Description="No Changes")
 
 #################### 
 # Helper functions #

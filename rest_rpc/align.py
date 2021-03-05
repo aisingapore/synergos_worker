@@ -5,7 +5,6 @@
 ####################
 
 # Generic/Built-in
-import logging
 import os
 from pathlib import Path
 
@@ -17,9 +16,6 @@ from flask_restx import Namespace, Resource, fields
 from rest_rpc import app
 from rest_rpc.core.utils import Payload, MetaRecords
 from rest_rpc.poll import poll_input_model
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
@@ -34,7 +30,8 @@ ns_api = Namespace(
 db_path = app.config['DB_PATH']
 meta_records = MetaRecords(db_path=db_path)
 
-logging.info(f"align.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("align.py logged", Description="No Changes")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #

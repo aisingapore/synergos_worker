@@ -5,7 +5,6 @@
 ####################
 
 # Generic/Built-in
-import logging
 import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple, Union
@@ -48,9 +47,6 @@ from rest_rpc.core.datetime_serialization import (
     TimeDeltaSerializer
 )
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
 ##################
 # Configurations #
 ##################
@@ -61,7 +57,8 @@ payload_template = app.config['PAYLOAD_TEMPLATE']
 
 label_binarizer = LabelBinarizer()
 
-logging.info(f"utils.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("utils.py logged", Description="No Changes")
 
 ####################
 # Helper Functions #

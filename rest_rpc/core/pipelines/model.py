@@ -7,7 +7,6 @@
 # Generic
 import importlib
 import inspect
-import logging
 from collections import OrderedDict
 from typing import Tuple
 import os
@@ -16,20 +15,18 @@ import os
 import torch as th
 from torch import nn
 
-# Synergos logging
-from SynergosLogger.init_logging import logging
-
+# Custom
+from rest_rpc import app
 
 ##################
 # Configurations #
 ##################
 
-#logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
-
 MODULE_OF_LAYERS = "torch.nn"
 MODULE_OF_ACTIVATIONS = "torch.nn.functional"
 
-logging.info(f"model.py logged")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("model.py logged", Description="No Changes")
 
 ###################################
 # Model Abstraction Class - Model #

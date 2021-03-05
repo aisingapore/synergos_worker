@@ -127,6 +127,54 @@ def detect_configurations(dirname: str) -> Dict[str, str]:
     return {parse_filename(c_path): c_path for c_path in config_paths}
 
 
+def capture_system_snapshot() -> dict:
+    """
+    """
+    return {
+        'IS_MASTER': IS_MASTER,
+        'IN_DIR': IN_DIR,
+        'OUT_DIR': OUT_DIR,
+        'DATA_DIR': DATA_DIR,
+        'MODEL_DIR': MODEL_DIR,
+        'CUSTOM_DIR': CUSTOM_DIR,
+        'TEST_DIR': TEST_DIR,
+        'CORES_USED': CORES_USED,
+        'GPU_COUNT': GPU_COUNT,
+        'DB_PATH': DB_PATH,
+        'SCHEMAS': SCHEMAS,
+        'CACHE_TEMPLATE': CACHE_TEMPLATE,
+        'PREDICT_TEMPLATE': PREDICT_TEMPLATE
+    }
+
+
+def configure_node_logger(**logger_kwargs) -> WorkerLogger:
+    """ Initialises the synergos logger corresponding to the current node
+
+    Args:
+
+    Returns:
+
+    """
+    global NODE_LOGGER
+    NODE_LOGGER = WorkerLogger(**logger_kwargs)
+    NODE_LOGGER.initialise()
+    return NODE_LOGGER
+
+
+def configure_sysmetric_logger(**logger_kwargs) -> SysmetricLogger:
+    """ Initialises the sysmetric logger to facillitate polling for hardware
+        statistics
+
+    Args:
+
+    Returns:
+
+    """
+    global SYSMETRIC_LOGGER
+    SYSMETRIC_LOGGER = SysmetricLogger(**logger_kwargs)
+    return SYSMETRIC_LOGGER
+
+
 def install(package: str) -> bool:
     """ Allows for dynamic runtime installation of python modules. 
     
@@ -278,11 +326,11 @@ PAYLOAD_TEMPLATE = {
 """
 Synergos has certain optional components, such as a centrialised logging 
 server, as well as a metadata catalogue. This section governs configuration of 
-the worker node to facilitate such integrations, where applicable. 
+the worker node to facilitate such integrations, where applicable. This portion
+gets configured during runtime.
 """
-NODE_LOGGER = logging
-
-SYSMETRIC_LOGGER = logging
+NODE_LOGGER = None
+SYSMETRIC_LOGGER = None
 
 ##################################################
 # Synergos Worker Language Models Configurations #

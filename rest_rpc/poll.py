@@ -5,7 +5,6 @@
 ####################
 
 # Generic/Built-in
-import logging
 import os
 
 # Libs
@@ -17,10 +16,6 @@ from flask_restx import Namespace, Resource, fields
 from rest_rpc import app
 from rest_rpc.core.server import load_and_combine
 from rest_rpc.core.utils import Payload, MetaRecords
-from synlogger import WorkerLogger, SysmetricLogger
-
-# Synergos logging
-from SynergosLogger.init_logging import logging
 
 ##################
 # Configurations #
@@ -42,7 +37,8 @@ X_template = cache_template['X']
 y_template = cache_template['y']
 df_template = cache_template['dataframe']
 
-logging.info(f"poll.py logged", Description="No Changes")
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("poll.py logged", Description="No Changes")
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
