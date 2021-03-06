@@ -412,13 +412,21 @@ class Poll(Resource):
         # Search local database for cached operations
         retrieved_metadata = meta_records.read(project_id)
         logging.debug(
-            "Retrieved metadata tracked."
-            f">>> retrieved_metadata: {retrieved_metadata}"
+            "Retrieved metadata from database tracked.",
+            retrieved_metadata=retrieved_metadata,
+            ID_path=SOURCE_FILE,
+            ID_class=Poll.__name__, 
+            ID_function=Poll.get.__name__,
+            **request.view_args
         )
     
         logging.debug(
-            f">>>> request inputs: {request.json['tags']}"
-            
+            "Tags received from TTP tracked.",
+            received_tags=request.json['tags'],
+            ID_path=SOURCE_FILE,
+            ID_class=Poll.__name__, 
+            ID_function=Poll.get.__name__,
+            **request.view_args
         )
 
         if retrieved_metadata:
