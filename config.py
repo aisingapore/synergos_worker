@@ -17,6 +17,7 @@ import os
 import random
 import subprocess
 import sys
+import threading
 import zipfile
 from collections import defaultdict, OrderedDict
 from glob import glob
@@ -29,6 +30,8 @@ from typing import Dict
 import numpy as np
 import psutil
 import torch as th
+# from dotenv import load_dotenv
+# from flask_caching import Cache
 
 # Custom
 from synlogger.general import WorkerLogger, SysmetricLogger
@@ -42,6 +45,9 @@ SRC_DIR = Path(__file__).parent.absolute()
 API_VERSION = "0.1.0"
 
 infinite_nested_dict = lambda: defaultdict(infinite_nested_dict)
+
+# # Load environment variables
+# load_dotenv()
 
 ####################
 # Helper Functions #
@@ -128,7 +134,10 @@ def detect_configurations(dirname: str) -> Dict[str, str]:
 
 
 def capture_system_snapshot() -> dict:
-    """
+    """ Takes a snapshot of parameters used in system-wide operations
+
+    Returns:
+        System snapshot (dict)
     """
     return {
         'IS_MASTER': IS_MASTER,
@@ -148,12 +157,13 @@ def capture_system_snapshot() -> dict:
 
 
 def configure_node_logger(**logger_kwargs) -> WorkerLogger:
-    """ Initialises the synergos logger corresponding to the current node
+    """ Initialises the synergos logger corresponding to the current node type.
+        In this case, a WorkerLogger is initialised.
 
     Args:
-
+        logger_kwargs: Any parameters required for node logger configuration
     Returns:
-
+        Node logger (WorkerLogger)
     """
     global NODE_LOGGER
     NODE_LOGGER = WorkerLogger(**logger_kwargs)
@@ -163,12 +173,12 @@ def configure_node_logger(**logger_kwargs) -> WorkerLogger:
 
 def configure_sysmetric_logger(**logger_kwargs) -> SysmetricLogger:
     """ Initialises the sysmetric logger to facillitate polling for hardware
-        statistics
+        statistics.
 
     Args:
-
+        logger_kwargs: Any parameters required for node logger configuration
     Returns:
-
+        Sysmetric logger (SysmetricLogger)
     """
     global SYSMETRIC_LOGGER
     SYSMETRIC_LOGGER = SysmetricLogger(**logger_kwargs)
@@ -198,7 +208,6 @@ def install(package: str) -> bool:
 """ 
 General parameters required for processing inputs & outputs
 """
-
 # Define server's role: Master or slave
 IS_MASTER = False
 
@@ -221,7 +230,8 @@ CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
-CACHE = infinite_nested_dict()
+CACHE = infinite_nested_dict() # Cache()
+# THREAD_CONDITION = threading.Condition()
 
 # Allocate no. of cores for processes
 CORES_USED = psutil.cpu_count(logical=True) - 1
@@ -279,11 +289,13 @@ cache_dir = os.path.join(OUT_DIR, "$project_id", "preprocessing")
 aggregated_X_outpath = os.path.join(cache_dir, "preprocessed_X_$meta.npy")
 aggregated_y_outpath = os.path.join(cache_dir, "preprocessed_y_$meta.npy")
 aggregated_df_outpath = os.path.join(cache_dir, "combined_dataframe_$meta.csv")
+catalogue_outpath = os.path.join(cache_dir, "catalogue.json")
 CACHE_TEMPLATE = {
     'out_dir': Template(cache_dir),
     'X': Template(aggregated_X_outpath),
     'y': Template(aggregated_y_outpath),
-    'dataframe': Template(aggregated_df_outpath)
+    'dataframe': Template(aggregated_df_outpath),
+    'catalogue': Template(catalogue_outpath)
 }
 
 predict_outdir = os.path.join(
@@ -356,6 +368,5 @@ nltk_src_dir = os.path.join(CUSTOM_DIR, 'nltk_data')
 os.environ["NLTK_DATA"] = nltk_src_dir
 nltk_sources = list(Path(nltk_src_dir).glob('**/*.zip'))
 for nltk_src in nltk_sources:
-    print(nltk_src)
     with zipfile.ZipFile(nltk_src,"r") as zip_ref:
         zip_ref.extractall(path=nltk_src.parent)

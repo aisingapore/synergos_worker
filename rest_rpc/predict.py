@@ -9,7 +9,6 @@ from logging import NOTSET
 from pathlib import Path
 
 # Libs
-import jsonschema
 import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
@@ -23,7 +22,7 @@ from rest_rpc.core.utils import (
     construct_combination_key
 )
 from rest_rpc.initialise import cache
-from rest_rpc.align import alignment_model
+from rest_rpc.initialise import init_input_model
 
 ##################
 # Configurations #
@@ -46,6 +45,9 @@ outdir_template = predict_template['out_dir']
 y_pred_template = predict_template['y_pred']
 y_score_template = predict_template['y_score']
 stats_template = predict_template['statistics']
+
+cache = app.config['CACHE']
+cache_template = app.config['CACHE_TEMPLATE']['out_dir']
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("predict.py logged", Description="No Changes")
@@ -72,10 +74,10 @@ inferences_model = ns_api.model(
     }
 )
 
-prediction_input_model = ns_api.model(
-    name="prediction_input",
-    model={
-        'action': fields.String(required=True),
+prediction_input_model = ns_api.inherit(
+    "prediction_input",
+    init_input_model,
+    {
         'inferences': fields.Nested(inferences_model, required=True)
     }
 )

@@ -113,6 +113,7 @@ class Termination(Resource):
                 if wssw_process.is_alive():
                     wssw_process.terminate()    # end the process
                     wssw_process.join()         # reclaim resources from thread
+
                     logging.info(
                         f"WSSW process {wssw_process.pid} has been terminated.",
                         wssw_process_id=wssw_process.pid,
@@ -129,6 +130,7 @@ class Termination(Resource):
                         ID_function=Termination.post.__name__,
                         **request.view_args
                     )
+                    
                     assert not wssw_process.is_alive()
                     wssw_process.close()  
 

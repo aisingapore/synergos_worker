@@ -5,7 +5,14 @@
 ####################
 
 # Generic/Built-in
+import json
+import logging
+import multiprocessing as mp
 import os
+from pathlib import Path
+from queue import Queue
+from threading import Thread
+from typing import Dict
 
 # Libs
 import numpy as np
@@ -14,7 +21,7 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.server import load_and_combine
+from rest_rpc.core.server import load_proc
 from rest_rpc.core.utils import Payload, MetaRecords
 
 ##################
@@ -39,8 +46,108 @@ X_template = cache_template['X']
 y_template = cache_template['y']
 df_template = cache_template['dataframe']
 
+poll_queue = mp.Queue() # Method 1: Multiprocessing
+# poll_queue = Queue()    # Method 2: Multi-threading
+
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("poll.py logged", Description="No Changes")
+
+#############
+# Functions #
+#############
+
+def run_archival_jobs(job_queue):
+    """ Extracts job from polling queue and performs them sequentially. This is 
+        used as a safety feature for controlling the number of polling 
+        operations active at anytime, so as to prevent crashes during different
+        phases of the federated cycle.
+
+    Args:
+        job_queue (): Intermediary queue that steamlines the number of loading
+            jobs operable on the worker at any time.
+    """
+
+    def build_archives(keys: Dict[str, str], **kwargs):
+        """ Constructs archive based on specified datasets and caches them in 
+            the operations database for future use. 
+
+        Args:
+            keys (dict(str,str)): All prerequisite IDs to build a project archive
+            **kwargs: All parameters required to trigger archive building.
+                Current parameters include:
+                1) Action    --> What kind of ML operation to be done
+                2) Data tags --> Tokens to location of data sources
+        Returns:
+            Core archive (i.e. no relations attached) (dict)
+        """
+        operation_archive = load_proc(keys=keys, **kwargs)
+        return meta_records.update(**keys, updates=operation_archive)
+
+    while True:
+        logging.info(
+            "Polling job queue is live, awaiting jobs...",
+            ID_path=SOURCE_FILE,
+            ID_function=run_archival_jobs.__name__
+        )
+
+        while not job_queue.empty():
+            logging.info(
+                f"No. of jobs in queue: {job_queue.qsize()}",
+                job_count=job_queue.qsize(),
+                ID_path=SOURCE_FILE,
+                ID_function=run_archival_jobs.__name__
+            )
+
+            parameters = job_queue.get() # blocks until queue is populated
+            keys = parameters['keys']
+            logging.info(
+                f"Archival job for entry key {keys} received!",
+                keys=keys,
+                ID_path=SOURCE_FILE,
+                ID_function=run_archival_jobs.__name__
+            )
+
+            # try:
+            created_archive = build_archives(**parameters)
+            logging.info(
+                f"Archive created for entry key {keys}!",
+                keys=keys,
+                archive=created_archive,
+                ID_path=SOURCE_FILE,
+                ID_function=run_archival_jobs.__name__
+            )
+
+            # except Exception as e:
+            #     logging.error(
+            #         f"Archive for entry key {keys} failed to build! Error: {e}",
+            #         keys=keys,
+            #         ID_path=SOURCE_FILE,
+            #         ID_function=run_archival_jobs.__name__
+            #     )
+            #     pass
+
+            # job_queue.task_done()
+
+        import time
+        time.sleep(1)
+
+### Method 1: Multiprocessing ####
+
+# Internal queuing mechanism to prevent system overload
+archival_process = mp.Process(target=run_archival_jobs, args=(poll_queue,))
+
+# Ensures that when process exits, it attempts to terminate all of its 
+# daemonic child processes.
+archival_process.daemon = True 
+
+archival_process.start()
+
+
+### Method 2: Multi-threading ####
+
+# archival_thread = Thread(target=run_archival_jobs, args=(poll_queue,))
+# archival_thread.daemon = True
+# archival_thread.start()
 
 ###########################################################
 # Models - Used for marshalling (i.e. moulding responses) #
@@ -88,7 +195,7 @@ header_model = ns_api.model(
 schema_field = fields.Wildcard(fields.String())
 meta_model = ns_api.model(
     name="meta_schema",
-    model={"*": schema_field}
+    model={"*": schema_field}   # eg. {'x1': "float64", 'x2': "int64", ...}
 )
 
 schema_model = ns_api.model(
@@ -100,12 +207,130 @@ schema_model = ns_api.model(
     }
 )
 
+generic_feature_model = ns_api.model(
+    name="generic_feature_stats",
+    model={'datatype': fields.String(required=True)}
+)
+
+categorical_feature_model = ns_api.inherit(
+    "categorical_feature_metadata",
+    generic_feature_model,
+    {
+        'labels': fields.List(fields.String(), required=True),
+        'count': fields.Integer(required=True),
+        'unique': fields.Integer(required=True),
+        'top': fields.String(required=True),
+        'freq': fields.Integer(required=True)
+    }
+)
+categorical_meta_field = fields.Wildcard(fields.Nested(categorical_feature_model))
+categorical_meta_model = ns_api.model(
+    name="categorical_metadata",
+    model={"*": categorical_meta_field}
+)
+
+numeric_feature_model = ns_api.inherit(
+    "numeric_feature_metadata",
+    generic_feature_model,
+    {
+        'count': fields.Float(required=True),
+        'mean': fields.Float(required=True),
+        'std': fields.Float(required=True),
+        'min': fields.Float(required=True),
+        '25%': fields.Float(required=True),
+        '50%': fields.Float(required=True),
+        '75%': fields.Float(required=True),
+        'max': fields.Float(required=True)
+    }
+)
+numeric_meta_field = fields.Wildcard(fields.Nested(numeric_feature_model))
+numeric_meta_model = ns_api.model(
+    name="numeric_metadata",
+    model={"*": numeric_meta_field}
+)
+
+misc_meta_field = fields.Wildcard(fields.Nested(generic_feature_model))
+misc_meta_model = ns_api.model(
+    name="misc_metadata",
+    model={"*": misc_meta_field} # No marshalling enforced
+)
+
+feature_summary_meta_model = ns_api.model(
+    name="feature_summary_metadata",
+    model={
+        'cat_variables': fields.Nested(
+            categorical_meta_model, required=True, skip_none=True, 
+        ),
+        'num_variables': fields.Nested(
+            numeric_meta_model, required=True, skip_none=True,
+        ),
+        'misc_variables': fields.Nested(
+            misc_meta_model, required=True, skip_none=True,
+        )
+    }
+)
+
+tabular_meta_model = ns_api.model(
+    name="tabular_metadata",
+    model={
+        'features': fields.Nested(
+            feature_summary_meta_model, 
+            required=True, 
+            default={}
+        )
+    }
+)
+
+image_meta_model = ns_api.model(
+    name="image_metadata",
+    model={
+        'pixel_height': fields.Integer(required=True),
+        'pixel_width': fields.Integer(required=True),
+        'color': fields.String(required=True)
+    }
+)
+
+text_meta_model = ns_api.model(
+    name="text_metadata",
+    model={
+        'word_count': fields.Integer(required=True),
+        'sparsity': fields.Float(required=True),
+        'representation': fields.Float(required=True)
+    }
+)
+
+generic_meta_model = ns_api.model(
+    name="generic_metadata",
+    model={
+        'src_count': fields.Integer(required=True),
+        '_type': fields.String(required=True)
+    }
+)
+
+dataset_meta_model = ns_api.inherit(
+    "dataset_metadata", 
+    generic_meta_model,
+    tabular_meta_model,
+    image_meta_model,
+    text_meta_model
+)
+
+metadata_model = ns_api.model(
+    name="metadata",
+    model={
+        'train': fields.Nested(dataset_meta_model, required=True, skip_none=True),
+        'evaluate': fields.Nested(dataset_meta_model, skip_none=True),
+        'predict': fields.Nested(dataset_meta_model, skip_none=True)
+    }
+)
+
 poll_model = ns_api.model(
     name="poll",
     model={
         'headers': fields.Nested(header_model, required=True),
-        'schemas': fields.Nested(schema_model, required=True)
-        # Exports will not be made available to the TTP
+        'schemas': fields.Nested(schema_model, required=True),
+        'metadata': fields.Nested(metadata_model, required=True),
+        # Exports will not be made available to the TTP 
     }
 )
 
@@ -140,9 +365,113 @@ payload_formatter = Payload('Poll', ns_api, poll_output_model)
 class Poll(Resource):
     """ Provides necessary information from participant for orchestration """
 
-    @ns_api.doc("poll_metadata")
-    @ns_api.expect(poll_input_model)
+    @ns_api.doc("poll_retrieve_metadata")
     @ns_api.marshal_with(payload_formatter.singular_model)
+    def get(self, project_id):
+        """ Retrieves specified metadata regarding the worker.
+
+            JSON sent will contain the following information:
+            1) Data Headers
+
+            eg.
+
+            {
+                "headers": {
+                    "train": {
+                        "X": ["X1_1", "X1_2", "X2_1", "X2_2", "X3"],
+                        "y": ["target_1", "target_2"]
+                    },
+                    "evaluate": {
+                        "X": ["X1_1", "X1_2", "X2_1", "X3"],
+                        "y": ["target_1", "target_2"]
+                    }
+                },
+                "schemas": {
+                    "train": {
+                        "X1": "int32",
+                        "X2": "category", 
+                        "X3": "category", 
+                        "X4": "int32", 
+                        "X5": "int32", 
+                        "X6": "category", 
+                        "target": "category"
+                    },
+                    ...
+                },
+                "metadata":{
+                    "train":{
+                        'src_count': 1000,
+                        '_type': "<insert datatype>",
+                        <insert type-specific meta statistics>
+                        ...
+                    },
+                    ...
+                }
+            }
+        """
+        # Search local database for cached operations
+        retrieved_metadata = meta_records.read(project_id)
+        logging.debug(
+            "Retrieved metadata tracked."
+            f">>> retrieved_metadata: {retrieved_metadata}"
+        )
+    
+        logging.debug(
+            f">>>> request inputs: {request.json['tags']}"
+            
+        )
+
+        if retrieved_metadata:
+
+            # Check if important information (i.e. headers, schemas & metadata)
+            # have already been injected into the archive records, AND that
+            # there has been no changes to the declared dataset sets (via tags)
+            if (
+                retrieved_metadata['tags'] and 
+                retrieved_metadata['headers'] and 
+                retrieved_metadata['schemas'] and
+                retrieved_metadata['metadata'] and
+                retrieved_metadata['exports']
+            ) and (
+                retrieved_metadata['tags'] == request.json['tags']
+            ):
+                success_payload = payload_formatter.construct_success_payload(
+                    status=200,
+                    method="poll.get",
+                    params=request.view_args,
+                    data=retrieved_metadata
+                )
+
+                logging.info(
+                    "State polling retrieval successfully completed!", 
+                    code="200", 
+                    ID_path=SOURCE_FILE,
+                    ID_class=Poll.__name__, 
+                    ID_function=Poll.get.__name__,
+                    **request.view_args
+                )
+
+                return success_payload, 200
+
+            # Otherwise, this means that the archival job corresponding to the
+            # entry key is either still enqueued, or in progress. Either way, it
+            # means that the record is not ready for use.
+            else:
+                ns_api.abort(
+                    code=406, 
+                    message=f"Archival job for project '{project_id}' is still in progress! Please try again later."
+                )
+
+        else:
+            ns_api.abort(
+                code=404, 
+                message=f"Project '{project_id}' does not exist!"
+            )
+
+
+    @ns_api.doc("poll_load_metadata")
+    @ns_api.expect(poll_input_model)
+    # @ns_api.marshal_with(payload_formatter.singular_model)
     def post(self, project_id):
         """ Retrieves specified metadata regarding the worker.
 
@@ -199,6 +528,16 @@ class Poll(Resource):
                         "X6": "category", 
                         "target": "category"
                     }
+                    ...
+                },
+                "metadata":{
+                    "train":{
+                        'src_count': 1000,
+                        '_type': "<insert datatype>",
+                        <insert type-specific meta statistics>
+                        ...
+                    },
+                    ...
                 }
             }
         """
@@ -213,9 +552,11 @@ class Poll(Resource):
                     'tags': {},
                     'headers': {},
                     'schemas': {},
+                    'metadata': {},
                     'exports': {},
-                    'is_live': False,
-                    'in_progress': [],
+                    'process': None,    # process ID hosting WSSW
+                    'is_live': False,   # state of WSSW
+                    'in_progress': [],  # cycle combination(s) queued
                     'connections': [],
                     'results': {}
                 }
@@ -225,109 +566,23 @@ class Poll(Resource):
         # If polling operation had already been done before, skip preprocessing
         # (Note: this is only valid if the submitted set of tags are the same)
         if retrieved_metadata['tags'] == request.json['tags']:
-            data = retrieved_metadata   # retrieve aligned data from cache
+            status = 201    # resource was already created
 
-        # Otherwise, perform preprocessing and archive results of operation
+        # Otherwise, submit a job to the internal poll queue to perform 
+        # preprocessing, and archive results of operation
         else:
-            # try:
-            headers = {}
-            schemas = {}
-            exports = {}
-            for meta, tags in request.json['tags'].items():
-
-                if tags:
-
-                    sub_keys = {'project_id': project_id, 'meta': meta}
-
-                    # Prepare output directory for tensor export
-                    project_meta_dir = outdir_template.safe_substitute(sub_keys)
-                    project_cache_dir = os.path.join(project_meta_dir, "cache")
-                    os.makedirs(project_cache_dir, exist_ok=True)
-
-                    (X_tensor, y_tensor, X_header, y_header, schema, df
-                    ) = load_and_combine(
-                        action=request.json['action'],
-                        tags=tags, 
-                        out_dir=project_cache_dir,
-                        is_condensed=False
-                    )
-
-                    logging.debug(
-                        f"Polled X_header for federated cycle tracked.", 
-                        X_header=X_header,
-                        ID_path=SOURCE_FILE,
-                        ID_class=Poll.__name__, 
-                        ID_function=Poll.post.__name__,
-                        **request.view_args
-                    )
-                    logging.debug(
-                        f"Polled y_header for federated cycle tracked.",
-                        y_header=y_header, 
-                        ID_path=SOURCE_FILE,
-                        ID_class=Poll.__name__, 
-                        ID_function=Poll.post.__name__,
-                        **request.view_args
-                    )
-
-                    # Export X & y tensors for subsequent use
-                    X_export_path = X_template.safe_substitute(sub_keys)
-                    with open(X_export_path, 'wb') as xep:
-                        np.save(xep, X_tensor.numpy())
-
-                    y_export_path = y_template.safe_substitute(sub_keys)
-                    with open(y_export_path, 'wb') as yep:
-                        np.save(yep, y_tensor.numpy())
-
-                    # Export combined dataframe for subsequent use
-                    df_export_path = df_template.safe_substitute(sub_keys)
-                    df.to_csv(df_export_path, encoding='utf-8')
-
-                    exports[meta] = {
-                        'X': X_export_path, 
-                        'y': y_export_path,
-                        'dataframe': df_export_path
-                    }
-                    headers[meta] = {'X': X_header, 'y': y_header}
-                    schemas[meta] = schema
-
-                    logging.debug(
-                        f"Generated Exports for federated cycle tracked.",
-                        exports=exports, 
-                        ID_path=SOURCE_FILE,
-                        ID_class=Poll.__name__, 
-                        ID_function=Poll.post.__name__,
-                        **request.view_args
-                    )
-
-            meta_records.update(
-                project_id=project_id, 
-                updates={
-                    'tags': request.json['tags'],
-                    'headers': headers,
-                    'schemas': schemas,
-                    'exports': exports
-                }
-            )
-            data = meta_records.read(project_id)
-
-            # except KeyError:
-            #     ns_api.abort(                
-            #         code=417,
-            #         message="Insufficient info specified for metadata tracing!"
-            #     )
+            parameters = {'keys':request.view_args, **request.json}
+            poll_queue.put_nowait(parameters)
+            status = 202    # Job to create resource has been accepted
+            
+        # data = {'jobs': list(poll_queue.queue)} # return all jobs in queue
+        data = {'jobs': poll_queue.qsize()} # return all jobs in queue
 
         success_payload = payload_formatter.construct_success_payload(
-            status=200,
+            status=status,
             method="poll.post",
             params=request.view_args,
-            data=data
+            data=data,
+            strict_format=False
         )
-        logging.info(
-            "State polling successfully completed!", 
-            code="200", 
-            ID_path=SOURCE_FILE,
-            ID_class=Poll.__name__, 
-            ID_function=Poll.post.__name__,
-            **request.view_args
-        )
-        return success_payload, 200
+        return success_payload, status

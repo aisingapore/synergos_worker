@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 # Libs
+import numpy as np
 import pandas as pd
 import syft as sy
 import torch as th
@@ -31,6 +32,7 @@ from rest_rpc.core.pipelines import (
     ImagePipe, 
     TextPipe
 )
+from rest_rpc.core.utils import MetaExtractor
 from rest_rpc.core.custom import CustomServerWorker
 
 ##################
@@ -50,6 +52,13 @@ hook.local_worker.is_client_worker = False
 src_dir = app.config['SRC_DIR']
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
+
+cache_template = app.config['CACHE_TEMPLATE']
+outdir_template = cache_template['out_dir']
+X_template = cache_template['X']
+y_template = cache_template['y']
+df_template = cache_template['dataframe']
+catalogue_template = cache_template['catalogue']
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("server.py logged", Description="No Changes")
@@ -198,7 +207,10 @@ def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         # corresponding to their classes. Hence, extract these directories as
         # class names. Ignore `metadata.json`.
         if os.path.isdir(class_dir):
-            image_paths = [x for x in class_dir.glob("**/*") if x.is_file()]
+            image_paths = [
+                x for x in class_dir.glob("**/*") 
+                if x.is_file() and not x.name.startswith('.') # skip hidden files
+            ]
             class_images.append((_class, image_paths))
 
     if class_images:
@@ -315,8 +327,8 @@ def load_dataset(tag, out_dir=out_dir):
 
 
 def load_and_combine(
-    action,
-    tags,         
+    action: str,
+    tags: List[List[str]],         
     X_alignments: List[str] = None,
     y_alignments: List[str] = None,
     is_condensed: bool = False,
@@ -331,6 +343,12 @@ def load_and_combine(
                        declared datatypes
     
     Args:
+        action (str): Type of ML operation to be executed. Supported options
+            are as follows:
+            1) 'regress': Orchestrates FL grid to perform regression
+            2) 'classify': Orchestrates FL grid to perform classification
+            3) 'cluster': TBA
+            4) 'associate': TBA
         tags (list(list(str))): Tags of datasets to load into worker
     Returns:
         X_combined_tensor (th.Tensor)
@@ -411,7 +429,15 @@ def load_and_combine(
             is_condensed=is_condensed # before MFA, data MUST NOT be condensed
         )
 
-        # preprocessor.offload()
+        preprocessor.offload()
+
+        meta_extractor = MetaExtractor(
+            df=preprocessor.output, 
+            schema=preprocessor.schema,
+            dataset_type=datatype  # Dataset_type is either tab, img, txt
+        )
+
+        meta_extractor.extract() 
 
         logging.debug(
             f"X header of combined {datatype} dataset tracked.",
@@ -429,6 +455,13 @@ def load_and_combine(
             ID_path=SOURCE_FILE,
             ID_function=load_and_combine.__name__
         )
+        logging.debug(
+            f"Extracted Metadata of combined {datatype} dataset tracked.",
+            dataset_metadata=meta_extractor.metadata,
+            dataset_type=datatype,
+            ID_path=SOURCE_FILE,
+            ID_function=load_and_combine.__name__
+        )
 
         return (
             X_combined_tensor, 
@@ -436,8 +469,109 @@ def load_and_combine(
             X_combined_header, 
             y_combined_header, 
             preprocessor.schema,
-            preprocessor.output
+            preprocessor.output,
+            meta_extractor.metadata
         )
+
+
+def load_proc(keys: Dict[str, str], **kwargs) -> dict:
+    """ Helper function for loading & metadata analysis of specified datasets
+
+    Args:
+        keys (dict(str, str)): Composite keys identifying a federated cycle
+    Returns:
+        Operations archive (dict)
+    """
+    headers = {}
+    schemas = {}
+    metadata = {}
+    exports = {}
+    for meta, tags in kwargs['tags'].items():
+
+        if tags:
+
+            sub_keys = {**keys, 'meta': meta}
+
+            # Prepare output directory for tensor export
+            project_meta_dir = outdir_template.safe_substitute(sub_keys)
+            project_cache_dir = os.path.join(project_meta_dir, "cache")
+            os.makedirs(project_cache_dir, exist_ok=True)
+
+            (
+                X_tensor, y_tensor, 
+                X_header, y_header, 
+                schema, 
+                df, 
+                meta_stats
+            ) = load_and_combine(
+                action=kwargs['action'],
+                tags=tags, 
+                out_dir=project_cache_dir,
+                is_condensed=False
+            )
+
+            logging.debug(
+                f"Loaded X_header for specified federated cycle tracked.", 
+                X_header=X_header,
+                ID_path=SOURCE_FILE,
+                ID_function=load_proc.__name__,
+                **keys
+            )
+            logging.debug(
+                f"Loaded y_header for specified federated cycle tracked.",
+                y_header=y_header, 
+                ID_path=SOURCE_FILE,
+                ID_function=load_proc.__name__,
+                **keys
+            )
+
+            # Export X & y tensors for subsequent use
+            X_export_path = X_template.safe_substitute(sub_keys)
+            with open(X_export_path, 'wb') as xep:
+                np.save(xep, X_tensor.numpy())
+
+            y_export_path = y_template.safe_substitute(sub_keys)
+            with open(y_export_path, 'wb') as yep:
+                np.save(yep, y_tensor.numpy())
+
+            # Export combined dataframe for subsequent use
+            df_export_path = df_template.safe_substitute(sub_keys)
+            df.to_csv(df_export_path, encoding='utf-8')
+
+            exports[meta] = {
+                'X': X_export_path, 
+                'y': y_export_path,
+                'dataframe': df_export_path
+            }
+            headers[meta] = {'X': X_header, 'y': y_header}
+            schemas[meta] = schema
+            metadata[meta] = meta_stats
+
+            logging.debug(
+                f"Generated Exports for federated cycle tracked.",
+                exports=exports, 
+                ID_path=SOURCE_FILE,
+                ID_function=load_proc.__name__,
+                **keys
+            )
+
+    # Export headers, schema & metadata extracted to "catalogue.json"
+    catalogue_outpath = catalogue_template.safe_substitute(keys)            
+    catalogue = {
+        'headers': headers, 
+        'schemas': schemas, 
+        'metadata': metadata
+    }
+    with open(catalogue_outpath, 'w') as cp:
+        json.dump(catalogue, cp)
+
+    return {
+        'tags': kwargs['tags'],
+        'headers': headers,
+        'schemas': schemas,
+        'metadata': metadata, 
+        'exports': exports
+    }
 
 
 def annotate(X, y, id, meta):
@@ -537,7 +671,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
                 ID_function=start_proc.__name__
             )
         
-            X_aligned, y_aligned, _, _, _, _ = load_and_combine(
+            X_aligned, y_aligned, _, _, _, _, _ = load_and_combine(
                 action=action,
                 tags=tags,
                 X_alignments=feature_alignment,
@@ -607,6 +741,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
     # Note: `auto_add=False` is necessary here because we want the WSSW object
     #       to get automatically garbage collected once it is no longer used.
     kwargs.update({'loop': loop})
+
     logging.info(
         "Worker metadata used for WSSW instantiation",
         **kwargs,
@@ -615,7 +750,6 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
     )
 
     server = participant(hook=hook, **kwargs)
-    # server.broadcast_queue = asyncio.Queue(loop=loop)
 
     p = Process(target=target, args=(server,))
 

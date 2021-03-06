@@ -4,10 +4,14 @@
 # Required Modules #
 ####################
 
+# from gevent import monkey
+# monkey.patch_all()
+
 # Generic/Built-in
 import argparse
 import logging
 import uuid
+from pathlib import Path
 
 # Libs
 
@@ -23,6 +27,7 @@ from config import (
 # Configurations #
 ##################
 
+SECRET_KEY = "synergos_worker" #os.urandom(24) # secret key
 
 #############
 # Functions #
@@ -80,7 +85,7 @@ def construct_logger_kwargs(**kwargs) -> dict:
 ###########
 
 if __name__ == "__main__":
-
+    
     parser = argparse.ArgumentParser(
         description="REST-RPC Receiver for a Synergos Network."
     )
@@ -141,8 +146,38 @@ if __name__ == "__main__":
     sysmetric_logger.track("/test/path", 'TestClass', 'test_function')
 
     try:
+
+        ###########################
+        # Implementation Footnote #
+        ###########################
+
+        # [Cause]
+        # To allow custom Synergos Logging components to permeate the entire
+        # system, these loggers have to be initialised first before the system
+        # performs module loading. 
+
+        # [Problems]
+        # Importing app right at the start of the page causes system modules to
+        # be loaded first, resulting in AttributeErrors, since 
+        # synlogger.general.WorkerLogger has not been intialised, and thus, its
+        # corresponding `synlog` attribute cannot be referenced.
+
+        # [Solution]
+        # Import system modules only after loggers have been intialised.
+
         from rest_rpc import app
+
+        # cache = app.config['CACHE']
+        # cache.init_app(
+        #     app=app, 
+        #     config={
+        #         "CACHE_TYPE": "filesystem",
+        #         'CACHE_DIR': Path('/worker/tmp')
+        #     }
+        # )
+        
         app.run(host="0.0.0.0", port=5000)
 
     finally:
         sysmetric_logger.terminate()
+
