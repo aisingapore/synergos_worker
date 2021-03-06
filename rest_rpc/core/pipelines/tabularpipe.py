@@ -29,6 +29,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 cores_used = app.config['CORES_USED']
 
 logging = app.config['NODE_LOGGER'].synlog
@@ -91,7 +93,12 @@ class TabularPipe(BasePipe):
         with open(schema_path, 'r') as s:
             schema = json.load(s)
 
-            logging.debug(f"No. of keys in schema: {schema} {len(schema)}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
+            logging.debug(
+                f"No. of keys in schema: {schema} {len(schema)}", 
+                ID_path=SOURCE_FILE,
+                ID_class=TabularPipe.__name__, 
+                ID_function=TabularPipe.load_tabular.__name__
+            )
 
         ##################################################
         # Edge Case: No seeding values for interpolation #
@@ -120,7 +127,12 @@ class TabularPipe(BasePipe):
 
         # Augment schema to cater to condensed dataset
         na_slices = data.columns[data.isna().all()].to_list()
-        logging.debug(f"NA slices: {na_slices}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
+        logging.debug(
+            f"NA slices: {na_slices}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabular.__name__
+        )
 
         condensed_schema = {
             feature: d_type for feature, d_type in schema.items()
@@ -128,9 +140,24 @@ class TabularPipe(BasePipe):
         }
         condensed_data = data.dropna(axis='columns', how='all')
         
-        logging.debug(f"Condensed schema: {condensed_schema}, length: {len(condensed_schema.keys())}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
-        logging.debug(f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
-        logging.debug(f"Difference: {set(condensed_schema.keys()).symmetric_difference(set(condensed_data.columns))}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
+        logging.debug(
+            f"Condensed schema: {condensed_schema}, length: {len(condensed_schema.keys())}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabular.__name__
+        )
+        logging.debug(
+            f"Condensed columns: {list(condensed_data.columns)}, length: {len(condensed_data.columns)}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabular.__name__
+        )
+        logging.debug(
+            f"Difference: {set(condensed_schema.keys()).symmetric_difference(set(condensed_data.columns))}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabular.__name__
+        )
         assert set(condensed_schema.keys()) == set(condensed_data.columns)
 
         preprocessor = Preprocessor(
@@ -145,7 +172,12 @@ class TabularPipe(BasePipe):
         )
         interpolated_data = preprocessor.interpolate()
 
-        logging.debug(f"After local interpolation: {interpolated_data.dtypes.to_dict()}", Class=TabularPipe.__name__, function=TabularPipe.load_tabular.__name__)
+        logging.debug(
+            f"After local interpolation: {interpolated_data.dtypes.to_dict()}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabular.__name__
+        )
 
         return interpolated_data
 
@@ -188,7 +220,12 @@ class TabularPipe(BasePipe):
             sort=False
         ).drop_duplicates().reset_index(drop=True).astype(aggregated_schema)
 
-        logging.debug(f"Tag-unified Schema: {aggregated_df.dtypes.to_dict()} {len(aggregated_df.dtypes.to_dict())}", Class=TabularPipe.__name__, function=TabularPipe.load_tabulars.__name__)
+        logging.debug(
+            f"Tag-unified Schema: {aggregated_df.dtypes.to_dict()} {len(aggregated_df.dtypes.to_dict())}", 
+            ID_path=SOURCE_FILE,
+            ID_class=TabularPipe.__name__, 
+            ID_function=TabularPipe.load_tabulars.__name__
+        )
 
         return aggregated_df
 

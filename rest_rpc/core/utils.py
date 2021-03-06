@@ -5,10 +5,11 @@
 ####################
 
 # Generic/Built-in
+import os
 import uuid
 from datetime import datetime
+from logging import NOTSET
 from typing import Dict, List, Tuple, Union
-import os
 
 # Libs
 import jsonschema
@@ -50,6 +51,8 @@ from rest_rpc.core.datetime_serialization import (
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 schemas = app.config['SCHEMAS']
 db_path = app.config['DB_PATH']
@@ -171,7 +174,12 @@ class Payload:
         self.__template['data'] = formatted_data
 
         jsonschema.validate(self.__template, schemas['payload_schema'])
-        logging.info(f"Operation was successful...")
+        logging.info(
+            f"Operation was successful!",
+            ID_path=SOURCE_FILE,
+            ID_class=Payload.__name__,
+            ID_function=Payload.construct_success_payload.__name__    
+        )
         return self.__template      
 
 #####################################
@@ -569,13 +577,28 @@ class Benchmarker:
         """
         # Calculate confusion matrix
         cf_matrix = confusion_matrix(self.y_true, self.y_pred)
-        logging.debug(f"Confusion matrix: {cf_matrix}")
+        logging.debug(
+            "Confusion matrix of calculated benchmarks tracked.",
+            cf_matrix=cf_matrix,
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._find_stratified_descriptors.__name__    
+        )
 
         FPs = cf_matrix.sum(axis=0) - np.diag(cf_matrix)  
         FNs = cf_matrix.sum(axis=1) - np.diag(cf_matrix)
         TPs = np.diag(cf_matrix)
         TNs = cf_matrix[:].sum() - (FPs + FNs + TPs)
-        logging.debug(f"TNs: {TNs}, FPs: {FPs}, FNs: {FNs}, TP: {TPs}")
+        logging.debug(
+            "Classification statistics of calculated benchmarks tracked.",
+            TNs=TNs,
+            FPs=FPs,
+            FNs=FNs,
+            TPs=TPs,
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._find_stratified_descriptors.__name__
+        )
         
         descriptors = {'TNs': TNs, 'FPs': FPs, 'FNs': FNs, 'TPs': TPs}
         for des_type, descriptor_values in descriptors.items():
@@ -631,7 +654,13 @@ class Benchmarker:
         MSE = mean_squared_error(self.y_true, self.y_pred)
         MAE = mean_absolute_error(self.y_true, self.y_pred)
         # Log regressions stats
-        logging.debug(f"R2: {R2}, MSE: {MSE}, MAE: {MAE}", action="regress")
+        logging.debug(
+            f"R2: {R2}, MSE: {MSE}, MAE: {MAE}",
+            action="regress",
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._analyse_regression.__name__
+        )
         return {'R2': R2, 'MSE': MSE, 'MAE': MAE}
 
 
@@ -690,9 +719,30 @@ class Benchmarker:
             ohe_y_pred = np.concatenate((1-self.y_pred, self.y_pred), axis=1)
             ohe_y_score = np.concatenate((1-self.y_score, self.y_score), axis=1)
 
-        #logging.notset(f"OHE y_true: {ohe_y_true}", function=_decode_ohe_dataset.__name__)
-        #logging.notset(f"OHE y_pred: {ohe_y_pred}", function=_decode_ohe_dataset.__name__)
-        #logging.notset(f"OHE y_score: {ohe_y_score}", function=_decode_ohe_dataset.__name__)
+        logging.log(
+            level=NOTSET,
+            event="OHE y_true tracked",
+            ohe_y_true=ohe_y_true,
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._decode_ohe_dataset.__name__
+        )
+        logging.log(
+            level=NOTSET,
+            event="OHE y_pred tracked",
+            ohe_y_pred=ohe_y_pred, 
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._decode_ohe_dataset.__name__
+        )
+        logging.log(
+            level=NOTSET,
+            event="OHE y_score tracked",
+            ohe_y_score=ohe_y_score, 
+            ID_path=SOURCE_FILE,
+            ID_class=Benchmarker.__name__,
+            ID_function=Benchmarker._decode_ohe_dataset.__name__
+        )
         return ohe_y_true, ohe_y_pred, ohe_y_score
 
     def reconstruct_dataset(self):
@@ -735,7 +785,12 @@ class Benchmarker:
             return self._analyse_classification()
 
         else:
-            logging.error(f"ML action {action} is not supported!")
+            logging.error(
+                f"ML action {action} is not supported!",
+                ID_path=SOURCE_FILE,
+                ID_class=Benchmarker.__name__,
+                ID_function=Benchmarker.analyse.__name__    
+            )
             raise ValueError(f"ML action {action} is not supported!")
         
 

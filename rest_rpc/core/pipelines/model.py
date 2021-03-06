@@ -7,9 +7,9 @@
 # Generic
 import importlib
 import inspect
+import os
 from collections import OrderedDict
 from typing import Tuple
-import os
 
 # Libs
 import torch as th
@@ -21,6 +21,8 @@ from rest_rpc import app
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 MODULE_OF_LAYERS = "torch.nn"
 MODULE_OF_ACTIVATIONS = "torch.nn.functional"
@@ -137,7 +139,12 @@ class Model(nn.Module):
             return layer
 
         except AttributeError:
-            logging.error(f"Specified layer type '{layer_type}' is not supported!", Class=Model.__name__, function=Model.__parse_layer_type.__name__)
+            logging.error(
+                f"Specified layer type '{layer_type}' is not supported!",
+                ID_path=SOURCE_FILE,
+                ID_class=Model.__name__, 
+                ID_function=Model.__parse_layer_type.__name__
+            )
 
 
     @staticmethod
@@ -155,7 +162,12 @@ class Model(nn.Module):
             return activation
 
         except AttributeError:
-            logging.error(f"Specified activation type '{activation_type}' is not supported!", Class=Model.__name__, function=Model.__parse_activation_type.__name__)
+            logging.error(
+                f"Specified activation type '{activation_type}' is not supported!",
+                ID_path=SOURCE_FILE,
+                ID_class=Model.__name__, 
+                ID_function=Model.__parse_activation_type.__name__
+            )
 
     ##################
     # Core Functions #

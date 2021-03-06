@@ -21,6 +21,7 @@ from rest_rpc.poll import poll_input_model
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
 
 ns_api = Namespace(
     "align", 
@@ -167,18 +168,41 @@ class Alignment(Resource):
                     params=request.view_args,
                     data=updated_metadata
                 )
-                logging.info(f"Successful payload", status="200", Class=Alignment.__name__, function=Alignment.post.__name__)
+                logging.info(
+                    f"Alignments successfully archived!",
+                    status="200",
+                    ID_path=SOURCE_FILE,
+                    ID_class=Alignment.__name__, 
+                    ID_function=Alignment.post.__name__,
+                    **request.view_args
+                )
                 return success_payload, 200
 
             except KeyError:
-                logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Alignment.__name__, function=Alignment.post.__name__)
+                logging.error(
+                    f"Project not yet initialised!",  
+                    code="404", 
+                    description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.",
+                    ID_path=SOURCE_FILE,
+                    ID_class=Alignment.__name__, 
+                    ID_function=Alignment.post.__name__,
+                    **request.view_args
+                )
                 ns_api.abort(
                     code=404, 
                     message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."
                 )  
 
         else:
-            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Alignment.__name__, function=Alignment.post.__name__)
+            logging.error(
+                f"Project not yet initialised!", 
+                code="404", 
+                description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", 
+                ID_path=SOURCE_FILE,
+                ID_class=Alignment.__name__, 
+                ID_function=Alignment.post.__name__,
+                **request.view_args
+            )
             ns_api.abort(
                 code=404, 
                 message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."

@@ -146,11 +146,3 @@ if __name__ == "__main__":
 
     finally:
         sysmetric_logger.terminate()
-
-
-
-##############
-# Deprecated #
-##############
-"""
-"""

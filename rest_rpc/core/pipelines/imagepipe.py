@@ -26,6 +26,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("imagepipe.py logged", Description="No Changes")
 

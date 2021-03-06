@@ -5,6 +5,7 @@
 # Generic/Built-in
 import json
 import os
+from logging import NOTSET
 from pathlib import Path
 
 # Libs
@@ -27,6 +28,8 @@ from rest_rpc.align import alignment_model
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 ns_api = Namespace(
     "predict", 
@@ -260,8 +263,22 @@ class Prediction(Resource):
             # in cache for retrieval/operation
             wss_worker = cache[project_id]['participant']
 
-            logging.debug(f"Objects in WSSW: {wss_worker._objects}", Class=Prediction.__name__, function=Prediction.post.__name__)
-            logging.debug(f"Objects in hook: {wss_worker.hook.local_worker._objects}", Class=Prediction.__name__, function=Prediction.post.__name__)
+            logging.debug(
+                f"Objects in WSSW tracked.",
+                wssw_objects=wss_worker._objects,
+                ID_path=SOURCE_FILE,
+                ID_class=Prediction.__name__, 
+                ID_function=Prediction.post.__name__,
+                **request.view_args
+            )
+            logging.debug(
+                f"Objects in core hook tracked.",
+                hook_objects=wss_worker.hook.local_worker._objects, 
+                ID_path=SOURCE_FILE,
+                ID_class=Prediction.__name__, 
+                ID_function=Prediction.post.__name__,
+                **request.view_args
+            )
 
             try:
                 action = request.json['action']
@@ -271,7 +288,16 @@ class Prediction(Resource):
 
                     if inference:
 
-                        #logging.notset(f"Inference: {inference}", Class=Prediction.__name__, function=Prediction.post.__name__)
+                        logging.log(
+                            level=NOTSET,
+                            event=f"[{meta}] Inferred values received for federated inference tracked.",
+                            meta=meta,
+                            inference=inference, 
+                            ID_path=SOURCE_FILE,
+                            ID_class=Prediction.__name__, 
+                            ID_function=Prediction.post.__name__,
+                            **request.view_args
+                        )
 
                         sub_keys = {
                             'project_id': project_id, 
@@ -291,8 +317,30 @@ class Prediction(Resource):
                         # Retrieved aligned y_true labels
                         labels = wss_worker.search(["#y", f"#{meta}"])[0].numpy()
 
-                        #logging.notset(f"y_pred: {y_pred}, {type(y_pred)}, {y_pred.shape}", Class=Prediction.__name__, function=Prediction.post.__name__)
-                        #logging.notset(f"Labels: {labels}, {type(labels)}, {labels.shape}", Class=Prediction.__name__, function=Prediction.post.__name__)
+                        logging.log(
+                            level=NOTSET,
+                            event=f"[{meta}] Loaded y_pred metadata for federated inference tracked.",
+                            meta=meta,
+                            y_pred_raw=y_pred,
+                            y_pred_type=type(y_pred),
+                            y_pred_shape=y_pred.shape, 
+                            ID_path=SOURCE_FILE,
+                            ID_class=Prediction.__name__, 
+                            ID_function=Prediction.post.__name__,
+                            **request.view_args
+                        )
+                        logging.log(
+                            level=NOTSET,
+                            event=f"[{meta}] Loaded label metadata for federated inference tracked.",
+                            meta=meta,
+                            labels_raw=labels,
+                            labels_type=type(labels),
+                            labels_shape=labels.shape, 
+                            ID_path=SOURCE_FILE,
+                            ID_class=Prediction.__name__, 
+                            ID_function=Prediction.post.__name__,
+                            **request.view_args
+                        )
 
                         # Calculate inference statistics
                         benchmarker = Benchmarker(labels, y_pred, y_score)
@@ -334,7 +382,14 @@ class Prediction(Resource):
                     updates=retrieved_metadata
                 )
                 
-                logging.debug(f"Updated Metadata: {updated_metadata}", Class=Prediction.__name__, function=Prediction.post.__name__)
+                logging.debug(
+                    "Updated metadata for federated inference tracked.",
+                    updated_metadata=updated_metadata, 
+                    ID_path=SOURCE_FILE,
+                    ID_class=Prediction.__name__, 
+                    ID_function=Prediction.post.__name__,
+                    **request.view_args
+                )
 
                 success_payload = payload_formatter.construct_success_payload(
                     status=200,
@@ -342,18 +397,41 @@ class Prediction(Resource):
                     params=request.view_args,
                     data=updated_metadata
                 )
-                logging.info(f"Successful payload", code="200", Class=Prediction.__name__, function=Prediction.post.__name__)
+                logging.info(
+                    "Federated inference successfully completed!", 
+                    code="200", 
+                    ID_path=SOURCE_FILE,
+                    ID_class=Prediction.__name__, 
+                    ID_function=Prediction.post.__name__,
+                    **request.view_args
+                )
                 return success_payload, 200
 
             except KeyError:
-                logging.error(f"Project not initialised", code="417", description="Insufficient info specified for metadata tracing!", Class=Prediction.__name__, function=Prediction.post.__name__)
+                logging.error(
+                    f"Project not initialised", 
+                    code="417", 
+                    description="Insufficient info specified for metadata tracing!", 
+                    ID_path=SOURCE_FILE,
+                    ID_class=Prediction.__name__, 
+                    ID_function=Prediction.post.__name__,
+                    **request.view_args
+                )
                 ns_api.abort(                
                     code=417,
                     message="Insufficient info specified for metadata tracing!"
                 )
 
         else:
-            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Prediction.__name__, function=Prediction.post.__name__)
+            logging.error(
+                f"Project not initialised", 
+                code="404", 
+                description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", 
+                ID_path=SOURCE_FILE,
+                ID_class=Prediction.__name__, 
+                ID_function=Prediction.post.__name__,
+                **request.view_args
+            )
 
             ns_api.abort(
                 code=404, 

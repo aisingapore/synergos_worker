@@ -27,6 +27,7 @@ from rest_rpc.initialise import cache, init_output_model
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
 
 ns_api = Namespace(
     "terminate", 
@@ -112,14 +113,35 @@ class Termination(Resource):
                 if wssw_process.is_alive():
                     wssw_process.terminate()    # end the process
                     wssw_process.join()         # reclaim resources from thread
-                    logging.info(f"Terminated process id: {wssw_process.pid}", Class=Termination.__name__, function=Termination.post.__name__)
-                    logging.info(f"Terminated process exitcode: {wssw_process.exitcode}", Class=Termination.__name__, function=Termination.post.__name__)
+                    logging.info(
+                        f"WSSW process {wssw_process.pid} has been terminated.",
+                        wssw_process_id=wssw_process.pid,
+                        ID_path=SOURCE_FILE,
+                        ID_class=Termination.__name__, 
+                        ID_function=Termination.post.__name__,
+                        **request.view_args
+                    )
+                    logging.info(
+                        f"Terminated process exitcode: {wssw_process.exitcode}", 
+                        wssw_process_exitcode=wssw_process.exitcode,
+                        ID_path=SOURCE_FILE,
+                        ID_class=Termination.__name__, 
+                        ID_function=Termination.post.__name__,
+                        **request.view_args
+                    )
                     assert not wssw_process.is_alive()
                     wssw_process.close()  
 
                 retrieved_metadata['is_live'] = False
 
-            logging.info(f"Termination - Current state of Cache: {cache}")
+            logging.info(
+                f"Termination - Current state of Cache tracked.", 
+                cache=cache,
+                ID_path=SOURCE_FILE,
+                ID_class=Termination.__name__, 
+                ID_function=Termination.post.__name__,
+                **request.view_args
+            )
 
             retrieved_metadata['in_progress'].remove(expt_run_key)
 
@@ -134,12 +156,24 @@ class Termination(Resource):
                 params=request.view_args,
                 data=updated_metadata
             )
-            logging.info(f"Successful payload", code="200", Class=Termination.__name__, function=Termination.post.__name__)
+            logging.info(
+                "Federated cycle successfully initialised!", 
+                code="200", 
+                ID_path=SOURCE_FILE,
+                ID_class=Termination.__name__, 
+                ID_function=Termination.post.__name__,
+                **request.view_args
+            )
             return success_payload, 200
 
         else:
-            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Termination.__name__, function=Termination.post.__name__)
-
+            logging.error(
+                f"Project not yet initialised", 
+                code="404", 
+                description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", 
+                Class=Termination.__name__, 
+                function=Termination.post.__name__
+            )
             ns_api.abort(
                 code=404, 
                 message=f"Project '{project_id}' has not been initialised! Please poll and try again."

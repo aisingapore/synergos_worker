@@ -10,6 +10,7 @@ import math
 import os
 import re
 from collections import Counter
+from logging import NOTSET
 from pathlib import Path
 from typing import Dict, List
 
@@ -37,6 +38,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 # Configure symspell for spelling correction
 symspell_dictionaries = app.config['SYMSPELL_DICTIONARIES']
 symspell_bigrams = app.config['SYMSPELL_BIGRAMS']
@@ -53,9 +56,10 @@ for ssp_bigram_path in symspell_bigrams:
     sym_spell.load_dictionary(ssp_bigram_path, term_index=0, count_index=2)
 
 # Configure Spacy for nlp operations
-# [For the current set of supported NLP operations, Spacy implementations have
-#  been tested to be computationally worse off than NLTK implementations. Hence,
-#  temporarily disable Spacy loadings to exclude Spacy-related runtime errors]
+# Note: For the current set of supported NLP operations, Spacy implementations 
+# have been tested to be computationally worse off than NLTK implementations. 
+# Hence, temporarily disable Spacy loadings to exclude Spacy-related runtime 
+# errors.
 # spacy_nlp = spacy.load('en_core_web_sm')
 
 cores_used = app.config['CORES_USED']
@@ -601,6 +605,13 @@ class TextPipe(BasePipe):
 
             self.output = self.create_docterm_matrix(unified_corpus)
 
-        #logging.notset(f"Doc-term matrix: {self.output.data}", Class=TextPipe.__name__, function=TextPipe.run.__name__)
+        logging.log(
+            level=NOTSET,
+            event="Doc-term matrix tracked.",
+            docterm_matrix=self.output, 
+            ID_path=SOURCE_FILE,
+            ID_class=TextPipe.__name__, 
+            ID_function=TextPipe.run.__name__
+        )
 
         return self.output

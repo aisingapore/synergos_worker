@@ -27,6 +27,8 @@ from rest_rpc.core.pipelines.dataset import Singleton, PipeData
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 HEADERFILE = "clean_engineered_headers.txt"
 DATAFILE = "clean_engineered_data.npy"
 SCHEMAFILE = "clean_engineered_schema.json"
@@ -56,7 +58,6 @@ class BasePipe(AbstractPipe):
         self.data = data
         self.des_dir = des_dir
         self.output = self.load()
-        #logging.notset(f"After initialisation, self.output: {self.output}")
 
     ############        
     # Checkers #
@@ -104,7 +105,12 @@ class BasePipe(AbstractPipe):
             schema (dict(str, str))
         """
         if not self.is_processed():
-            logging.error("Data must first be processed!", Class=BasePipe.__name__, function=BasePipe.parse_output.__name__)
+            logging.error(
+                "Data must first be processed!",
+                ID_path=SOURCE_FILE,
+                ID_class=BasePipe.__name__, 
+                ID_function=BasePipe.parse_output.__name__
+            )
             raise RuntimeError("Data must first be processed!")
         
         headers = self.output.columns.to_list()
@@ -166,15 +172,33 @@ class BasePipe(AbstractPipe):
             raise RuntimeError("Data must first be processed!")
         
         features = self.output.drop(columns=['target'])
-        logging.debug(f"Feature datatypes: {features.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
+        logging.debug(
+            f"Feature datatypes of pre-transformed dataset tracked.",
+            feature_datatypes=features.dtypes.to_dict(), 
+            ID_path=SOURCE_FILE,
+            ID_class=BasePipe.__name__, 
+            ID_function=BasePipe.transform.__name__
+        )
 
         if is_ohe:
             features = pd.get_dummies(features)
 
         if is_sorted:
             features = features.reindex(sorted(features.columns), axis=1)
-            logging.debug(f"Sorted features: {features.columns}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
-            logging.debug(f"Sorted datatypes: {features.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
+            logging.debug(
+                f"Sorted features of dataset tracked.",
+                sorted_features=features.columns, 
+                ID_path=SOURCE_FILE,
+                ID_class=BasePipe.__name__, 
+                ID_function=BasePipe.transform.__name__
+            )
+            logging.debug(
+                f"Datatypes corresponding to sorted features of dataset tracked.",
+                sorted_features_datatypes=features.dtypes.to_dict(), 
+                ID_path=SOURCE_FILE,
+                ID_class=BasePipe.__name__, 
+                ID_function=BasePipe.transform.__name__
+            )
 
         ###########################
         # Implementation Footnote #
@@ -219,7 +243,13 @@ class BasePipe(AbstractPipe):
         else:
             raise ValueError(f"ML action {action} is not supported!")
         
-        logging.debug(f"Target datatypes: {targets.dtypes.to_dict()}", Class=BasePipe.__name__, function=BasePipe.transform.__name__)
+        logging.debug(
+            "Datatypes corresponding to target of dataset tracked.",
+            targets_datatypes=targets.dtypes.to_dict(),
+            ID_path=SOURCE_FILE,
+            ID_class=BasePipe.__name__, 
+            ID_function=BasePipe.transform.__name__
+        )
 
         if not is_condensed:
             targets = pd.get_dummies(targets) # no effect on regression values
@@ -284,7 +314,12 @@ class BasePipe(AbstractPipe):
             return converted_output
 
         else:
-            logging.error("Pipeline needs to be ran first!", Class=BasePipe.__name__, function=BasePipe.offload.__name__)
+            logging.error(
+                "Pipeline needs to be ran first!", 
+                ID_path=SOURCE_FILE,
+                ID_class=BasePipe.__name__, 
+                ID_function=BasePipe.offload.__name__
+            )
             raise RuntimeError("Pipeline needs to be ran first!")
 
 

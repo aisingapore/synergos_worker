@@ -7,7 +7,8 @@
 # Generic/Built-in
 import concurrent.futures
 import json
-import logging
+import os
+from logging import NOTSET
 from typing import Dict, List, Union
 
 # Libs
@@ -20,6 +21,8 @@ from rest_rpc import app
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("dataset.py logged", Description="No Changes")
@@ -121,7 +124,12 @@ class ComplexSingleton(Singleton):
                 if col != 'target':
                     dataset[col] = dataset[col].apply(tuple)
             except TypeError:
-                logging.warning("Non-tuple when tried to be casted into tuple throws error", Class=ComplexSingleton.__name__, function=ComplexSingleton.data.__name__)
+                logging.warning(
+                    "Non-tuple when tried to be casted into tuple throws error",
+                    ID_path=SOURCE_FILE,
+                    ID_class=ComplexSingleton.__name__, 
+                    ID_function=ComplexSingleton.data.__name__
+                )
                 # Skip any non-iterable elements
                 pass
 
@@ -295,7 +303,14 @@ class PipeData:
             Combined dataset (pd.DataFrame)
         """
         df_list = self.__load_data(singletons)
-        logging.debug(f"DF List: {df_list}", Class=PipeData.__name__, function=PipeData.__combine_data.__name__)
+        logging.log(
+            level=NOTSET,
+            event="DF List tracked.",
+            df_list=df_list, 
+            ID_path=SOURCE_FILE,
+            ID_class=PipeData.__name__, 
+            ID_function=PipeData.__combine_data.__name__
+        )
 
         return pd.concat(
             df_list, 

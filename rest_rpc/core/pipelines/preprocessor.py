@@ -8,9 +8,8 @@
 import os
 import random
 from pathlib import Path
+from logging import NOTSET
 from typing import Dict, List, Tuple, Callable
-import multiprocessing
-
 
 # Libs
 import numpy as np
@@ -33,6 +32,8 @@ from rest_rpc.core.pipelines.dataset import PipeData
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 BUFFER_FEATURE = "B" + "_"*5 + "#" # entirely arbitrarily chosen
 
@@ -102,7 +103,13 @@ class Preprocessor(BasePipe):
             if schema
             else self.data.dtypes.apply(lambda x: x.name).to_dict()
         )
-        logging.debug(f"Schema in Preprocessor: {self.schema}")
+        logging.debug(
+            f"Schema in Preprocessor tracked.",
+            schema=self.schema,
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__,
+            ID_function=Preprocessor.__init__.__name__
+        )
 
     ############        
     # Checkers #
@@ -363,13 +370,28 @@ class Preprocessor(BasePipe):
         Returns:
             Augmented dataset (th.Tensor)
         """
-        logging.debug(f"Alignment indexes: {alignment_idxs}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
+        logging.debug(
+            f"Alignment indexes: {alignment_idxs}",
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__, 
+            ID_function=Preprocessor.align_dataset.__name__
+        )
 
         aligned_dataset = dataset.copy()
         for idx in alignment_idxs:
 
-            logging.debug(f"Current spacer index: {idx}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
-            logging.debug(f"Before augmentation: size is {aligned_dataset.shape}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
+            logging.debug(
+                f"Current spacer index: {idx}", 
+                ID_path=SOURCE_FILE,
+                ID_class=Preprocessor.__name__, 
+                ID_function=Preprocessor.align_dataset.__name__
+            )
+            logging.debug(
+                f"Before augmentation: size is {aligned_dataset.shape}", 
+                ID_path=SOURCE_FILE,
+                ID_class=Preprocessor.__name__, 
+                ID_function=Preprocessor.align_dataset.__name__
+            )
 
             if self.datatype == "image":
                 pix_pad, _, _ = self.extract_image_metadata()
@@ -384,7 +406,12 @@ class Preprocessor(BasePipe):
                 axis=1
             )
 
-            logging.debug(f"After augmentation: size is {aligned_dataset.shape}", Class=Preprocessor.__name__, function=Preprocessor.align_dataset.__name__)
+            logging.debug(
+                f"After augmentation: size is {aligned_dataset.shape}", 
+                ID_path=SOURCE_FILE,
+                ID_class=Preprocessor.__name__, 
+                ID_function=Preprocessor.align_dataset.__name__
+            )
         
         return aligned_dataset
 
@@ -438,8 +465,24 @@ class Preprocessor(BasePipe):
             is_condensed=is_condensed
         )
 
-        logging.debug(f"Transformed default X headers: {X_header} {len(X_header)}", Class=Preprocessor.__name__, function=Preprocessor.transform_defaults.__name__)
-        logging.debug(f"Transformed default y headers: {y_header} {len(y_header)}", Class=Preprocessor.__name__, function=Preprocessor.transform_defaults.__name__)
+        logging.log(
+            level=NOTSET,
+            event="Transformed default X header tracked.",
+            X_header=X_header,
+            X_header_count=len(X_header),
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__, 
+            ID_function=Preprocessor.transform_defaults.__name__
+        )
+        logging.log(
+            level=NOTSET,
+            event="Transformed default y header tracked.",
+            y_header=y_header,
+            y_header_count=len(y_header), 
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__, 
+            ID_function=Preprocessor.transform_defaults.__name__
+        )
 
         if X_alignments:
             X = self.align_dataset(X, X_alignments)
@@ -495,7 +538,14 @@ class Preprocessor(BasePipe):
             X_header = self.align_header(X_header, X_alignments)
 
         formatted_X = formatted_X.reshape((data_count, -1, height, width))
-        #logging.notset(f"Formatted_X: {formatted_X}", Class=Preprocessor.__name__, function=Preprocessor.transform_images.__name__)
+        logging.log(
+            level=NOTSET,
+            event=f"Formatted Image features tracked.",
+            formatted_X=formatted_X,
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__, 
+            ID_function=Preprocessor.transform_images.__name__
+        )
 
         if y_alignments:
             y = self.align_dataset(y, y_alignments)
@@ -551,7 +601,14 @@ class Preprocessor(BasePipe):
             Padded Data (pd.DataFrame)
         """
         if self.datatype == "image":
-            logging.debug(f"Preprocessor's input data: {self.data}", Class=Preprocessor.__name__, function=Preprocessor.pad.__name__)
+            logging.log(
+                level=NOTSET,
+                event="Preprocessor's input data tracked.",
+                input_data=self.data, 
+                ID_path=SOURCE_FILE,
+                ID_class=Preprocessor.__name__, 
+                ID_function=Preprocessor.pad.__name__
+            )
             self.output = self.pad_images(self.data)
         
         elif self.datatype == "text":
@@ -703,7 +760,15 @@ class Preprocessor(BasePipe):
         else:
             raise ValueError(f"ML action {action} is not supported!")
 
-        #logging.notset(f"Casted y_tensor: {y_tensor} {y_tensor.type()}", Class=Preprocessor.__name__, function=Preprocessor.transform.__name__)
+        logging.log(
+            level=NOTSET,
+            event="Casted y_tensor tracked.",
+            y_tensor=y_tensor,
+            y_tensor_type=y_tensor.type(), 
+            ID_path=SOURCE_FILE,
+            ID_class=Preprocessor.__name__, 
+            ID_function=Preprocessor.transform.__name__
+        )
 
         return X_tensor, y_tensor, X_header, y_header
 

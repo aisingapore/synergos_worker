@@ -12,11 +12,14 @@ from typing import Callable
 
 
 # Custom
+from rest_rpc import app
 
 ##################
 # Configurations #
 ##################
 
+logging = app.config['NODE_LOGGER'].synlog
+logging.debug("abstract.py logged", Description="No Changes")
 
 ####################################################
 # Data Preprocessing Abstract Class - AbstractPipe #

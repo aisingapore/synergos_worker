@@ -21,6 +21,8 @@ from rest_rpc.core.utils import Payload, MetaRecords
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 ns_api = Namespace(
     "poll", 
     description='API to faciliate metadata retrieval from participant.'
@@ -250,8 +252,22 @@ class Poll(Resource):
                         is_condensed=False
                     )
 
-                    logging.debug(f"Polled X_header: {X_header}", Class=Poll.__name__, function=Poll.post.__name__)
-                    logging.debug(f"Polled y_header: {y_header}", Class=Poll.__name__, function=Poll.post.__name__)
+                    logging.debug(
+                        f"Polled X_header for federated cycle tracked.", 
+                        X_header=X_header,
+                        ID_path=SOURCE_FILE,
+                        ID_class=Poll.__name__, 
+                        ID_function=Poll.post.__name__,
+                        **request.view_args
+                    )
+                    logging.debug(
+                        f"Polled y_header for federated cycle tracked.",
+                        y_header=y_header, 
+                        ID_path=SOURCE_FILE,
+                        ID_class=Poll.__name__, 
+                        ID_function=Poll.post.__name__,
+                        **request.view_args
+                    )
 
                     # Export X & y tensors for subsequent use
                     X_export_path = X_template.safe_substitute(sub_keys)
@@ -274,8 +290,14 @@ class Poll(Resource):
                     headers[meta] = {'X': X_header, 'y': y_header}
                     schemas[meta] = schema
 
-                    logging.debug(f"Exports: {exports}", Class=Poll.__name__, function=Poll.post.__name__)
-
+                    logging.debug(
+                        f"Generated Exports for federated cycle tracked.",
+                        exports=exports, 
+                        ID_path=SOURCE_FILE,
+                        ID_class=Poll.__name__, 
+                        ID_function=Poll.post.__name__,
+                        **request.view_args
+                    )
 
             meta_records.update(
                 project_id=project_id, 
@@ -299,5 +321,13 @@ class Poll(Resource):
             method="poll.post",
             params=request.view_args,
             data=data
+        )
+        logging.info(
+            "State polling successfully completed!", 
+            code="200", 
+            ID_path=SOURCE_FILE,
+            ID_class=Poll.__name__, 
+            ID_function=Poll.post.__name__,
+            **request.view_args
         )
         return success_payload, 200

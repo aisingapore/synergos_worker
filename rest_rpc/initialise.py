@@ -25,6 +25,8 @@ from rest_rpc.align import alignment_model
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 ns_api = Namespace(
     "initialise", 
     description='API to faciliate WSSW startup for participant.'
@@ -188,7 +190,13 @@ class Initialisation(Resource):
             if not cache[project_id]:
 
                 # try:
-                logging.info(f"Initialising Project", Class=Initialisation.__name__, function=Initialisation.post.__name__)
+                logging.info(
+                    f"Initialising WSSW for participation in federated cycle...",
+                    ID_path=SOURCE_FILE,
+                    ID_class=Initialisation.__name__, 
+                    ID_function=Initialisation.post.__name__,
+                    **request.view_args
+                )
                 project_cache_dir = os.path.join(
                     outdir_template.safe_substitute(project_id=project_id), 
                     "cache"
@@ -203,7 +211,13 @@ class Initialisation(Resource):
                 cache[project_id]['process'] = wssw_process
                 cache[project_id]['participant'] = wss_worker
                 
-                logging.info(f"Project initialised successfully, Project ID: {project_id}.", Class=Initialisation.__name__, function=Initialisation.post.__name__)
+                logging.info(
+                    f"WSSW for federated cycle initialised successfully.", 
+                    ID_path=SOURCE_FILE,
+                    ID_class=Initialisation.__name__, 
+                    ID_function=Initialisation.post.__name__,
+                    **request.view_args
+                )
                 
                 # except OSError:
                 #     pass
@@ -215,8 +229,14 @@ class Initialisation(Resource):
                 # Resource already exists   --> 200
                 status = 200
             
-            logging.debug(f"Initialisation - Current state of Cache: {cache}", Class=Initialisation.__name__, function=Initialisation.post.__name__)
-
+            logging.debug(
+                f"Initialisation - Current state of Cache tracked.", 
+                cache=cache,
+                ID_path=SOURCE_FILE,
+                ID_class=Initialisation.__name__, 
+                ID_function=Initialisation.post.__name__,
+                **request.view_args
+            )
 
             retrieved_metadata['is_live'] = cache[project_id]['process'].is_alive()
             
@@ -239,11 +259,25 @@ class Initialisation(Resource):
                 params=request.view_args,
                 data=updated_metadata
             )
-            logging.info(f"Sucessful Payload", Class=Initialisation.__name__, function=Initialisation.post.__name__)
+            logging.info(
+                "Federated cycle successfully initialised!",
+                ID_path=SOURCE_FILE,
+                ID_class=Initialisation.__name__, 
+                ID_function=Initialisation.post.__name__,
+                **request.view_args
+            )
             return success_payload, status
     
         else:
-            logging.error(f"Project not initialised", code="404", description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.", Class=Initialisation.__name__, function=Initialisation.post.__name__)
+            logging.error(
+                f"Project not yet initialised!",  
+                code="404", 
+                description=f"Project logs '{project_id}' has not been initialised! Please poll and try again.",
+                ID_path=SOURCE_FILE,
+                ID_class=Initialisation.__name__, 
+                ID_function=Initialisation.post.__name__,
+                **request.view_args
+            )
             ns_api.abort(
                 code=404, 
                 message=f"Project logs '{project_id}' has not been initialised! Please poll and try again."

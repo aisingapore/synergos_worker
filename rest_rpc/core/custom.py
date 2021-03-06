@@ -28,6 +28,8 @@ from rest_rpc import app
 # Configurations #
 ##################
 
+SOURCE_FILE = os.path.abspath(__file__)
+
 hook = sy.TorchHook(th, is_client=False)
 
 logging = app.config['NODE_LOGGER'].synlog
