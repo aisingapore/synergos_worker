@@ -188,7 +188,7 @@ class TabularPipe(BasePipe):
         Returns
             Aggregated tabular dataset (pd.DataFrame)
         """
-        with concurrent.futures.ProcessPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             datasets = list(executor.map(self.load_tabular, self.data))
 
         ###########################
