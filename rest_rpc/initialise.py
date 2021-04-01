@@ -16,8 +16,8 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.server import start_proc
-from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
+from rest_rpc.core.server import load_metadata_records, start_proc
+from rest_rpc.core.utils import Payload, construct_combination_key
 from rest_rpc.poll import tag_model, schema_model
 from rest_rpc.align import alignment_model
 
@@ -33,9 +33,6 @@ ns_api = Namespace(
 )
 
 cache = app.config['CACHE']
-
-db_path = app.config['DB_PATH']
-meta_records = MetaRecords(db_path=db_path)
 
 cache_template = app.config['CACHE_TEMPLATE']
 outdir_template = cache_template['out_dir']
@@ -79,6 +76,7 @@ init_output_model = ns_api.model(
             ns_api.model(
                 name='key',
                 model={
+                    'collab_id': fields.String(),
                     'project_id': fields.String(),
                     'expt_id': fields.String(),
                     'run_id': fields.String()
@@ -98,7 +96,7 @@ payload_formatter = Payload('Initialise', ns_api, init_output_model)
 # Resources #
 #############
 
-@ns_api.route('/<project_id>/<expt_id>/<run_id>')
+@ns_api.route('/<collab_id>/<project_id>/<expt_id>/<run_id>')
 @ns_api.response(200, "Existing WSSW object found")
 @ns_api.response(201, "New WSSW object instantiated")
 @ns_api.response(404, "Project logs has not been initialised")
@@ -109,7 +107,7 @@ class Initialisation(Resource):
     @ns_api.doc("initialise_wssw")
     @ns_api.expect(init_input_model)
     @ns_api.marshal_with(payload_formatter.singular_model)
-    def post(self, project_id, expt_id, run_id):
+    def post(self, collab_id, project_id, expt_id, run_id):
         """ Start up WebsocketServerWorker for representing participant hosting
             this worker container
             
@@ -182,6 +180,9 @@ class Initialisation(Resource):
             }
         """ 
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
+        logging.warn(f"---> {meta_records.db_path}")
+
         retrieved_metadata = meta_records.read(project_id)
 
         if retrieved_metadata:
@@ -198,7 +199,7 @@ class Initialisation(Resource):
                     **request.view_args
                 )
                 project_cache_dir = os.path.join(
-                    outdir_template.safe_substitute(project_id=project_id), 
+                    outdir_template.safe_substitute(**request.view_args), 
                     "cache"
                 )
                 wssw_process, wss_worker = start_proc(

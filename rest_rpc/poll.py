@@ -21,8 +21,8 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.server import load_proc
-from rest_rpc.core.utils import Payload, MetaRecords
+from rest_rpc.core.server import load_metadata_records, load_proc
+from rest_rpc.core.utils import Payload
 
 ##################
 # Configurations #
@@ -34,17 +34,6 @@ ns_api = Namespace(
     "poll", 
     description='API to faciliate metadata retrieval from participant.'
 )
-
-out_dir = app.config['OUT_DIR']
-
-db_path = app.config['DB_PATH']
-meta_records = MetaRecords(db_path=db_path)
-
-cache_template = app.config['CACHE_TEMPLATE']
-outdir_template = cache_template['out_dir']
-X_template = cache_template['X']
-y_template = cache_template['y']
-df_template = cache_template['dataframe']
 
 poll_queue = mp.Queue() # Method 1: Multiprocessing
 # poll_queue = Queue()    # Method 2: Multi-threading
@@ -80,8 +69,14 @@ def run_archival_jobs(job_queue):
         Returns:
             Core archive (i.e. no relations attached) (dict)
         """
+        meta_records = load_metadata_records(keys=keys)
         operation_archive = load_proc(keys=keys, **kwargs)
-        return meta_records.update(**keys, updates=operation_archive)
+
+        meta_id = keys.get('project_id')
+        updated_entry = meta_records.update(meta_id, updates=operation_archive)
+        logging.warn(f"{operation_archive} >>>{updated_entry}")
+
+        return updated_entry
 
     while True:
         logging.info(
@@ -344,6 +339,7 @@ poll_output_model = ns_api.inherit(
             ns_api.model(
                 name='key',
                 model={
+                    'collab_id': fields.String(),
                     'project_id': fields.String()
                 }
             ),
@@ -358,7 +354,7 @@ payload_formatter = Payload('Poll', ns_api, poll_output_model)
 # Resources #
 #############
 
-@ns_api.route('/<project_id>')
+@ns_api.route('/<collab_id>/<project_id>')
 @ns_api.response(200, "Initialised project logs successfully")
 @ns_api.response(417, "Insufficient info specified for metadata tracing")
 @ns_api.response(500, "Internal failure")
@@ -367,7 +363,7 @@ class Poll(Resource):
 
     @ns_api.doc("poll_retrieve_metadata")
     @ns_api.marshal_with(payload_formatter.singular_model)
-    def get(self, project_id):
+    def get(self, collab_id, project_id):
         """ Retrieves specified metadata regarding the worker.
 
             JSON sent will contain the following information:
@@ -410,7 +406,9 @@ class Poll(Resource):
             }
         """
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
+
         logging.debug(
             "Retrieved metadata from database tracked.",
             retrieved_metadata=retrieved_metadata,
@@ -480,7 +478,7 @@ class Poll(Resource):
     @ns_api.doc("poll_load_metadata")
     @ns_api.expect(poll_input_model)
     # @ns_api.marshal_with(payload_formatter.singular_model)
-    def post(self, project_id):
+    def post(self, collab_id, project_id):
         """ Retrieves specified metadata regarding the worker.
 
             JSON received will contain the following information:
@@ -550,6 +548,7 @@ class Poll(Resource):
             }
         """
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
 
         # Polling initialises the project logs if it does not exist yet

@@ -15,9 +15,9 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
+from rest_rpc.core.server import load_metadata_records
 from rest_rpc.core.utils import (
     Payload, 
-    MetaRecords, 
     Benchmarker, 
     construct_combination_key
 )
@@ -34,11 +34,6 @@ ns_api = Namespace(
     "predict", 
     description='API to faciliate federated inference for participant.'
 )
-
-out_dir = app.config['OUT_DIR']
-
-db_path = app.config['DB_PATH']
-meta_records = MetaRecords(db_path=db_path)
 
 predict_template = app.config['PREDICT_TEMPLATE']
 outdir_template = predict_template['out_dir']
@@ -148,6 +143,7 @@ prediction_output_model = ns_api.inherit(
             ns_api.model(
                 name='key',
                 model={
+                    'collab_id': fields.String(),
                     'project_id': fields.String(),
                     'expt_id': fields.String(),
                     'run_id': fields.String()
@@ -164,7 +160,7 @@ payload_formatter = Payload('Predict', ns_api, prediction_output_model)
 # Resources #
 #############
 
-@ns_api.route('/<project_id>/<expt_id>/<run_id>')
+@ns_api.route('/<collab_id>/<project_id>/<expt_id>/<run_id>')
 @ns_api.response(200, 'Predictions cached successfully')
 @ns_api.response(404, "Project logs has not been initialised")
 @ns_api.response(417, "Insufficient info specified for auto-assembly")
@@ -174,7 +170,7 @@ class Prediction(Resource):
     @ns_api.doc("predict_data")
     @ns_api.expect(prediction_input_model)
     @ns_api.marshal_with(payload_formatter.singular_model)
-    def post(self, project_id, expt_id, run_id):
+    def post(self, collab_id, project_id, expt_id, run_id):
         """ Receives and reconstructs test dataset to pair with prediction 
             labels yielded from federated inference, and export the aligned
             prediction sets to file, before returning the computed statistics.
@@ -255,6 +251,7 @@ class Prediction(Resource):
         expt_run_key = construct_combination_key(expt_id, run_id)
 
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
         
         if (retrieved_metadata and 
@@ -301,12 +298,7 @@ class Prediction(Resource):
                             **request.view_args
                         )
 
-                        sub_keys = {
-                            'project_id': project_id, 
-                            'expt_id': expt_id,
-                            'run_id': run_id,
-                            'meta': meta
-                        }
+                        sub_keys = {**request.view_args, 'meta': meta}
 
                         # Prepare output directory for tensor export
                         meta_out_dir = outdir_template.safe_substitute(sub_keys)
@@ -401,7 +393,7 @@ class Prediction(Resource):
                 )
                 logging.info(
                     "Federated inference successfully completed!", 
-                    code="200", 
+                    code=200, 
                     ID_path=SOURCE_FILE,
                     ID_class=Prediction.__name__, 
                     ID_function=Prediction.post.__name__,

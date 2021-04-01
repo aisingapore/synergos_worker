@@ -63,7 +63,7 @@ def construct_logger_kwargs(**kwargs) -> dict:
     censor_keys = (
         [
             'SRC_DIR', 'IN_DIR', 'OUT_DIR', 'DATA_DIR', 'MODEL_DIR', 
-            'CUSTOM_DIR', 'TEST_DIR', 'DB_PATH', 'CACHE_TEMPLATE', 
+            'CUSTOM_DIR', 'TEST_DIR', 'DB_TEMPLATE', 'CACHE_TEMPLATE', 
             'PREDICT_TEMPLATE'
         ]
         if is_censored 

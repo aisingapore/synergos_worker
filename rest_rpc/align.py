@@ -14,7 +14,8 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.utils import Payload, MetaRecords
+from rest_rpc.core.server import load_metadata_records
+from rest_rpc.core.utils import Payload
 from rest_rpc.poll import poll_input_model
 
 ##################
@@ -27,9 +28,6 @@ ns_api = Namespace(
     "align", 
     description='API to faciliate metadata retrieval from participant.'
 )
-
-db_path = app.config['DB_PATH']
-meta_records = MetaRecords(db_path=db_path)
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("align.py logged", Description="No Changes")
@@ -89,7 +87,7 @@ payload_formatter = Payload('Align', ns_api, alignment_output_model)
 # Resources #
 #############
 
-@ns_api.route('/<project_id>')
+@ns_api.route('/<collab_id>/<project_id>')
 @ns_api.response(200, 'Alignments cached successfully')
 @ns_api.response(404, "Project logs has not been initialised")
 @ns_api.response(417, "Insufficient info specified for data alignment")
@@ -99,7 +97,7 @@ class Alignment(Resource):
     @ns_api.doc("poll_metadata")
     @ns_api.expect(alignment_input_model)
     @ns_api.marshal_with(payload_formatter.singular_model)
-    def post(self, project_id):
+    def post(self, collab_id, project_id):
         """ Receives and caches the null indexes to be populated within the 
             worker's registered datasets in order for them to have the same 
             schema as all other participants
@@ -149,6 +147,7 @@ class Alignment(Resource):
             This data will be cached in the worker database for subsequent use.
         """
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
         
         if retrieved_metadata:

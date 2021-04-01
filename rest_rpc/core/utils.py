@@ -55,7 +55,7 @@ from rest_rpc.core.datetime_serialization import (
 SOURCE_FILE = os.path.abspath(__file__)
 
 schemas = app.config['SCHEMAS']
-db_path = app.config['DB_PATH']
+
 payload_template = app.config['PAYLOAD_TEMPLATE']
 
 label_binarizer = LabelBinarizer()
@@ -105,6 +105,7 @@ class Payload:
                     namespace.model(
                         name="route_parameters",
                         model={
+                            'collab_id': fields.String(),
                             'project_id': fields.String(),
                             'expt_id': fields.String(),
                             'run_id': fields.String(),
@@ -215,7 +216,7 @@ class Records:
         db_path (str): Path to json source
         *subjects: All subject types pertaining to records
     """
-    def __init__(self, db_path=db_path):
+    def __init__(self, db_path: str):
         self.db_path = db_path
 
     ###########
@@ -398,8 +399,12 @@ class Records:
 ####################################
 
 class MetaRecords(Records):
+    """ Records all metadata generated in a single PROJECT.
+        Note: This class is used to generate multiple `operations.json` for 
+        multiple collaborations.
+    """
     
-    def __init__(self, db_path=db_path):
+    def __init__(self, db_path: str):
         super().__init__(db_path=db_path)
 
     def __generate_key(self, project_id):
@@ -539,7 +544,7 @@ class MetaExtractor:
 
             logging.debug(
                 "Datatypes of meta-statistics calculated for numeric features tracked.",
-                [type(v) for k,v in meta_stats.items()],
+                meta_stats=[type(v) for k,v in meta_stats.items()],
                 ID_path=SOURCE_FILE,
                 ID_class=MetaExtractor.__name__,
                 ID_function=MetaExtractor.extract_numeric_feature_metadata.__name__

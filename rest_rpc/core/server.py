@@ -32,7 +32,7 @@ from rest_rpc.core.pipelines import (
     ImagePipe, 
     TextPipe
 )
-from rest_rpc.core.utils import MetaExtractor
+from rest_rpc.core.utils import MetaRecords, MetaExtractor
 from rest_rpc.core.custom import CustomServerWorker
 
 ##################
@@ -53,6 +53,8 @@ src_dir = app.config['SRC_DIR']
 data_dir = app.config['DATA_DIR']
 out_dir = app.config['OUT_DIR']
 
+db_template = app.config['DB_TEMPLATE']
+
 cache_template = app.config['CACHE_TEMPLATE']
 outdir_template = cache_template['out_dir']
 X_template = cache_template['X']
@@ -66,6 +68,23 @@ logging.debug("server.py logged", Description="No Changes")
 #############
 # Functions #
 #############
+
+def load_metadata_records(keys: Dict[str, str]) -> MetaRecords:
+    """ Given a set of keys uniquely identifying a federated cycle, load its
+        corresponding metadata records for subsequent use.
+
+    Args:
+        keys (dict(str, str)): Composite keys identifying a federated cycle
+    Returns:
+        Metadata records (MetaRecords)
+    """
+    db_path = db_template.substitute(keys)
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True) # create parents
+    logging.warn(f"{db_path}")
+
+    meta_records = MetaRecords(db_path=db_path)
+    return meta_records
+
 
 def detect_metadata(tag: List[str]) -> Tuple[str, Dict[str, bool]]:
     """ Retrieves participant defined metadata describing their declared 

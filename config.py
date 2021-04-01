@@ -149,7 +149,7 @@ def capture_system_snapshot() -> dict:
         'TEST_DIR': TEST_DIR,
         'CORES_USED': CORES_USED,
         'GPU_COUNT': GPU_COUNT,
-        'DB_PATH': DB_PATH,
+        'DB_TEMPLATE': DB_TEMPLATE,
         'SCHEMAS': SCHEMAS,
         'CACHE_TEMPLATE': CACHE_TEMPLATE,
         'PREDICT_TEMPLATE': PREDICT_TEMPLATE
@@ -255,9 +255,10 @@ logging.debug(f"No. of available GPUs: {GPU_COUNT}")
 In Synergos Worker, the database is used mainly for caching results of 
 operations triggered by the TTP's REST-RPC calls
 """
-DB_PATH = os.path.join(SRC_DIR, "outputs", "operations.json")
+db_outpath = os.path.join(OUT_DIR, "$collab_id", "$project_id", "operations.json")
+DB_TEMPLATE = Template(db_outpath)
 
-logging.debug(f"Database path detected: {DB_PATH}")
+logging.debug(f"Database template path detected: {DB_TEMPLATE}")
 
 ####################################
 # Synergos Worker Template Schemas #
@@ -285,7 +286,7 @@ trigger file exports to the local machine, while other requests
 (i.e. `initialise`) perform lazy loading and require access to these exports.
 This will ensure that all exported filenames are consistent during referencing.
 """
-cache_dir = os.path.join(OUT_DIR, "$project_id", "preprocessing")
+cache_dir = os.path.join(OUT_DIR, "$collab_id", "$project_id", "preprocessing")
 aggregated_X_outpath = os.path.join(cache_dir, "preprocessed_X_$meta.npy")
 aggregated_y_outpath = os.path.join(cache_dir, "preprocessed_y_$meta.npy")
 aggregated_df_outpath = os.path.join(cache_dir, "combined_dataframe_$meta.csv")
@@ -300,6 +301,7 @@ CACHE_TEMPLATE = {
 
 predict_outdir = os.path.join(
     OUT_DIR, 
+    "$collab_id",
     "$project_id", 
     "$expt_id", 
     "$run_id", 

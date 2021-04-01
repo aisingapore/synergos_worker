@@ -20,7 +20,8 @@ from flask_restx import Namespace, Resource, fields
 
 # Custom
 from rest_rpc import app
-from rest_rpc.core.utils import Payload, MetaRecords, construct_combination_key
+from rest_rpc.core.server import load_metadata_records
+from rest_rpc.core.utils import Payload, construct_combination_key
 from rest_rpc.initialise import cache, init_output_model
 
 ##################
@@ -33,9 +34,6 @@ ns_api = Namespace(
     "terminate", 
     description='API to faciliate WSSW termination for participant.'
 )
-
-db_path = app.config['DB_PATH']
-meta_records = MetaRecords(db_path=db_path)
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("terminate.py logged", Description="No Changes")
@@ -52,7 +50,7 @@ payload_formatter = Payload('Terminate', ns_api, init_output_model)
 # Resources #
 #############
 
-@ns_api.route('/<project_id>/<expt_id>/<run_id>')
+@ns_api.route('/<collab_id>/<project_id>/<expt_id>/<run_id>')
 @ns_api.response(200, "WSSW object successfully terminated")
 @ns_api.response(404, "WSSW object not found")
 @ns_api.response(500, 'Internal failure')
@@ -60,7 +58,7 @@ class Termination(Resource):
 
     @ns_api.doc("terminate_wssw")
     @ns_api.marshal_with(payload_formatter.singular_model)
-    def post(self, project_id, expt_id, run_id):
+    def post(self, collab_id, project_id, expt_id, run_id):
         """ Closes WebsocketServerWorker to prevent potential cyber attacks during
             times of inactivity
 
@@ -87,6 +85,7 @@ class Termination(Resource):
         expt_run_key = construct_combination_key(expt_id, run_id)
 
         # Search local database for cached operations
+        meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
                 
         if (retrieved_metadata and 
