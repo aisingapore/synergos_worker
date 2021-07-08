@@ -74,7 +74,6 @@ def run_archival_jobs(job_queue):
 
         meta_id = keys.get('project_id')
         updated_entry = meta_records.update(meta_id, updates=operation_archive)
-        logging.warn(f"{operation_archive} >>>{updated_entry}")
 
         return updated_entry
 

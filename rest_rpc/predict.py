@@ -375,6 +375,7 @@ class Prediction(Resource):
                     project_id=project_id, 
                     updates=retrieved_metadata
                 )
+                updated_metadata.update({'key': request.view_args})
                 
                 logging.debug(
                     "Updated metadata for federated inference tracked.",

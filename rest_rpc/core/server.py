@@ -80,8 +80,6 @@ def load_metadata_records(keys: Dict[str, str]) -> MetaRecords:
     """
     db_path = db_template.substitute(keys)
     Path(db_path).parent.mkdir(parents=True, exist_ok=True) # create parents
-    logging.warn(f"{db_path}")
-
     meta_records = MetaRecords(db_path=db_path)
     return meta_records
 
@@ -698,7 +696,7 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
                 is_condensed=True, # After MFA, data MUST be condensed!
                 out_dir=out_dir
             )
-            
+
             logging.debug(
                 f"Start process -> Descriptors of aligned X shape for {meta} dataset tracked.",
                 X_aligned_shape=X_aligned.shape,

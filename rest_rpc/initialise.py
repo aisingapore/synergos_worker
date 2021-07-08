@@ -181,7 +181,6 @@ class Initialisation(Resource):
         """ 
         # Search local database for cached operations
         meta_records = load_metadata_records(keys=request.view_args)
-        logging.warn(f"---> {meta_records.db_path}")
 
         retrieved_metadata = meta_records.read(project_id)
 
