@@ -78,7 +78,7 @@ def run_archival_jobs(job_queue):
         return updated_entry
 
     while True:
-        logging.info(
+        logging.debug(
             "Polling job queue is live, awaiting jobs...",
             ID_path=SOURCE_FILE,
             ID_function=run_archival_jobs.__name__
