@@ -171,3 +171,24 @@ class CustomServerWorker(WebsocketServerWorker):
 
             # send the response
             await websocket.send(response)
+
+
+    def clear_residuals(self):
+        """
+        """
+        logging.warning(f"Clear residuals triggered!")
+        logging.warning(f"Before clearing - no. of objects: {len(self.object_store._objects)}")
+
+        data_ids = [obj.id for obj in self.object_store.find_by_tag(tag="#X")]
+        label_ids = [obj.id for obj in self.object_store.find_by_tag(tag="#y")]
+
+        residual_ids = [
+            obj_id
+            for obj_id, _ in self.object_store._objects.items()
+            if (obj_id not in data_ids) and (obj_id not in label_ids)
+        ]
+        for obj_id in residual_ids:
+            self.object_store.rm_obj(obj_id=obj_id)
+            
+        logging.warning(f"After clearing - no. of objects: {len(self.object_store._objects)}")
+
