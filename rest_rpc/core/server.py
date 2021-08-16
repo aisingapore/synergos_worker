@@ -218,7 +218,7 @@ def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
         In each tag, images' file names with file extensions, and class labels which 
         they each belong to, are to be stored in img_path and label fields respectively,
         in mapping.csv. As an example of `mapping.csv`:
-            img_path, label
+            image, target
             image_1.png, 1
             image_2.png, 0
             image_3.png, 1
@@ -230,15 +230,15 @@ def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
     csv_path = Path(os.path.join(img_dir, 'mapping.csv')).resolve()
     image_label_df = pd.read_csv(csv_path)
     # Cast labels to string
-    image_label_df['label'] = image_label_df['label'].astype(str)
+    image_label_df['target'] = image_label_df['target'].astype(str)
     # Retrieve all listed labels
-    labels = image_label_df['label'].unique()
+    targets = image_label_df['target'].unique()
 
     # collate images for each class
-    for label in labels:
-        images = image_label_df[image_label_df['label'] == label]['img_path'].tolist()
+    for target in targets:
+        images = image_label_df[image_label_df['target'] == target]['image'].tolist()
         images = [Path(os.path.join(img_dir, image)).resolve() for image in images]
-        class_images.append((label, images))
+        class_images.append((target, images))
 
     if class_images:
         img_pipeline = ImagePipe(data=class_images, des_dir=out_dir)
