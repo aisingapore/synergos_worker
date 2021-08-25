@@ -189,46 +189,56 @@ def load_tabulars(tab_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
 
 def load_images(img_dir: str, metadata: dict, out_dir: str) -> pd.DataFrame:
     """ Loads in all image datasets found in the specified tagged directory.
-        Image datasets are expected to be organised according to their classes.
-        For example, if a dataset consists of 3 classes, the folder structure
-        that participants are expected to organise their images like this:
-        
+        All image files are expected to be organised into their respective tag
+        directories. For each tag directory, a `metadata.json` and `mapping.csv` file
+        is required. An example of the organisation of files:
         eg.
             /path
                 /matching
                     /declared
                         /tag
-                            /class_1
-                                image_1.png
-                                image_2.png
-                            /class_2
-                                image_3.png
-                            /class_3
-                                image_4.png
+                            image_1.png
+                            image_2.png
+                            image_3.png
+                            image_4.png
                             metadata.json
+                            mapping.csv
                         /another_tag
-                            /class_1
-                                image_5.jpeg
+                            image_5.jpeg
+                            metadata.json
+                            mapping.csv
                         /one_last_tag
-                            /class_4
-                                image_6.gif
+                            image_6.gif
+                            metadata.json
+                            mapping.csv
 
-        IMPORTANT: `metadata.json` is expected to reside in the same folder.
+        IMPORTANT: `metadata.json` and `mapping.csv` are expected to reside 
+        in the same tag folder.
+        
+        In each tag, images' file names with file extensions, and class labels which 
+        they each belong to, are to be stored in img_path and label fields respectively,
+        in mapping.csv. As an example of `mapping.csv`:
+            image, target
+            image_1.png, 1
+            image_2.png, 0
+            image_3.png, 1
+            image_4.png, 1
+        
+
     """
     class_images = []
-    for _class in os.listdir(img_dir):
+    csv_path = Path(os.path.join(img_dir, 'mapping.csv')).resolve()
+    image_label_df = pd.read_csv(csv_path)
+    # Cast labels to string
+    image_label_df['target'] = image_label_df['target'].astype(str)
+    # Retrieve all listed labels
+    targets = image_label_df['target'].unique()
 
-        class_dir = Path(os.path.join(img_dir, _class)).resolve()
-
-        # Based on the dictated file structure, images are sorted in directories
-        # corresponding to their classes. Hence, extract these directories as
-        # class names. Ignore `metadata.json`.
-        if os.path.isdir(class_dir):
-            image_paths = [
-                x for x in class_dir.glob("**/*") 
-                if x.is_file() and not x.name.startswith('.') # skip hidden files
-            ]
-            class_images.append((_class, image_paths))
+    # collate images for each class
+    for target in targets:
+        images = image_label_df[image_label_df['target'] == target]['image'].tolist()
+        images = [Path(os.path.join(img_dir, image)).resolve() for image in images]
+        class_images.append((target, images))
 
     if class_images:
         img_pipeline = ImagePipe(data=class_images, des_dir=out_dir)
