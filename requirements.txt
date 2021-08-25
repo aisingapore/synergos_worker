@@ -2,7 +2,6 @@ aiohttp==3.6.2
 beautifulsoup4==4.9.1
 catboost==0.20.1
 contractions==0.0.25
-diffprivlib==0.1.1
 flask==1.1.1
 flask-restx==0.2.0
 flask-caching==1.9.0
@@ -16,7 +15,6 @@ pandas==0.25.3
 pathos==0.2.5
 pillow==7.1.0
 psutil==5.7.0
-pytorch-ignite==0.3.0
 python-dotenv==0.15.0
 ray==0.7.7
 requests==2.22.0
@@ -42,17 +40,4 @@ werkzeug==1.0.1
 xgboost==0.90
 gevent-websocket==0.10.1
 gunicorn==20.0.4
-Flask-Sockets==0.2.1
-Flask-SQLAlchemy==2.4.4
-Flask-Migrate==2.5.3
-Flask-Cors==3.0.7
-Flask-Executor==0.9.3
-Flask-Login==0.5.0
-sqlalchemy_mixins==1.2.1
-pyjwt==1.7.1
-psycopg2-binary==2.8.5
-requests-toolbelt==0.9.1
-redis==3.5.3
-sqlalchemy_utils==0.36.8
 numpy==1.18.5
-wsaccel==0.6.2

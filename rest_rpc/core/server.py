@@ -638,36 +638,6 @@ def start_proc(participant=CustomServerWorker, out_dir=out_dir, **kwargs):
             server (WebsocketServerWorker): WS worker representing participant
         """
         server.start()
-
-    # def alternative_target(server):
-    #     """ Initialises Data centric server to listen to specified port for
-    #         incoming connections
-
-    #     Args:
-    #         server (WebsocketServerWorker): WS worker representing participant
-    #     """
-    #     driver_script_path = os.path.join(
-    #         src_dir, "rest_rpc", "core", "node", "run.sh"
-    #     )
-    #     command = "{} --id {} --host {} --port {} --start_local_db".format(
-    #         driver_script_path,
-    #         kwargs['id'],
-    #         kwargs['host'],
-    #         kwargs['port']
-    #     )
-    #     try:
-    #         worker_process = subprocess.run(
-    #             shlex.split(command),
-    #             check=True, 
-    #             stdout=subprocess.PIPE, 
-    #             stderr=subprocess.PIPE,
-    #             text=True
-    #         )
-    #         return worker_process
-
-    #     except subprocess.CalledProcessError as cpe:
-    #         logging.error(f"CustomWebsocketWorker: Something went wrong during tuning initialisation! {cpe}")
-    #         raise Exception
         
     action = kwargs.pop('action')
     all_tags = kwargs.pop('tags')

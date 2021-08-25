@@ -19,6 +19,9 @@ import pandas as pd
 import syft as sy
 import torch as th
 from syft.generic.abstract.tensor import AbstractTensor
+from syft.generic.object_storage import ObjectStore
+from syft.workers.abstract import AbstractWorker
+from syft.workers.message_handler import BaseMessageHandler
 from syft.workers.websocket_server import WebsocketServerWorker
 
 # Custom
@@ -34,6 +37,40 @@ hook = sy.TorchHook(th, is_client=False)
 
 logging = app.config['NODE_LOGGER'].synlog
 logging.debug("custom.py logged", Description="No Changes")
+
+###########################################
+# Custom Helper Class - CustomObjectStore #
+###########################################
+
+class CustomObjectStore(ObjectStore):
+
+    def __init__(self, owner: AbstractWorker):
+        super().__init__(owner=owner)
+
+    
+    def get_obj(self, obj_id: Union[str, int]) -> object:
+        """Returns the object from registry.
+        Look up an object from the registry using its ID.
+        Args:
+            obj_id: A string or integer id of an object to look up.
+        Returns:
+            Object with id equals to `obj_id`.
+        """
+
+        try:
+            obj = self._objects[obj_id]
+        except KeyError as e:
+            # if obj_id not in self._objects:
+            #     raise ObjectNotFoundError(obj_id, self)
+            # else:
+            #     raise e
+
+            logging.warning(f"object {obj_id} not found! Error: {e}")
+            obj_id = None
+
+        return obj
+
+
 
 ###########################################
 # Custom Async Class - CustomServerWorker #
@@ -87,6 +124,9 @@ class CustomServerWorker(WebsocketServerWorker):
             key_path=key_path
         )
         
+        # self.object_store = CustomObjectStore(owner=self)
+        # self.message_handlers.append(BaseMessageHandler(self.object_store, self))
+
         # Avoid Pytorch deadlock issues
         th.set_num_threads(1)
 
@@ -173,22 +213,23 @@ class CustomServerWorker(WebsocketServerWorker):
             await websocket.send(response)
 
 
-    def clear_residuals(self):
+    def clear_residuals(self, exclusions: List=[]):
         """
         """
         logging.warning(f"Clear residuals triggered!")
         logging.warning(f"Before clearing - no. of objects: {len(self.object_store._objects)}")
+        logging.warning(f"Exclusions recieved from TTP: {exclusions}")
 
         data_ids = [obj.id for obj in self.object_store.find_by_tag(tag="#X")]
         label_ids = [obj.id for obj in self.object_store.find_by_tag(tag="#y")]
 
-        residual_ids = [
-            obj_id
-            for obj_id, _ in self.object_store._objects.items()
-            if (obj_id not in data_ids) and (obj_id not in label_ids)
-        ]
-        for obj_id in residual_ids:
-            self.object_store.rm_obj(obj_id=obj_id)
+        whitelisted_ids = data_ids + label_ids + exclusions
+        logging.warning(f"Whitelisted IDs: {whitelisted_ids}")
+
+        all_ids = list(self.object_store._objects.keys())
+        for obj_id in all_ids:
+            if obj_id not in whitelisted_ids:
+                self.object_store.rm_obj(obj_id=obj_id)
             
         logging.warning(f"After clearing - no. of objects: {len(self.object_store._objects)}")
 
