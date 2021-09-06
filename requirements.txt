@@ -36,6 +36,7 @@ tinydb-smartcache==1.0.2
 tinyrecord==0.1.5
 tqdm==4.40.2
 uwsgi==2.0.19.1
+waitress==2.0.0
 werkzeug==1.0.1
 xgboost==0.90
 gevent-websocket==0.10.1

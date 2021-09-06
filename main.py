@@ -9,10 +9,9 @@ import argparse
 import logging
 import os
 import uuid
-from pathlib import Path
 
 # Libs
-
+from waitress import serve
 
 # Custom
 from config import (
@@ -29,7 +28,7 @@ from config import (
 
 SOURCE_FILE = os.path.abspath(__file__)
 
-SECRET_KEY = "synergos_worker" #os.urandom(24) # secret key
+SECRET_KEY = "synergos_worker" # secret key
 
 #############
 # Functions #
@@ -210,7 +209,7 @@ if __name__ == "__main__":
         # Import system modules only after loggers have been intialised.
 
         from rest_rpc import app       
-        app.run(host="0.0.0.0", port=5000)
+        serve(app, host='0.0.0.0', port=5000)
 
     finally:
         sysmetric_logger.terminate()
