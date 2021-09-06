@@ -30,8 +30,6 @@ from typing import Dict
 import numpy as np
 import psutil
 import torch as th
-# from dotenv import load_dotenv
-# from flask_caching import Cache
 
 # Custom
 from synlogger.general import WorkerLogger, SysmetricLogger
@@ -45,9 +43,6 @@ SRC_DIR = Path(__file__).parent.absolute()
 API_VERSION = "0.1.0"
 
 infinite_nested_dict = lambda: defaultdict(infinite_nested_dict)
-
-# # Load environment variables
-# load_dotenv()
 
 ####################
 # Helper Functions #
@@ -72,6 +67,22 @@ def seed_everything(seed: int = 42) -> bool:
 
     except:
         return False
+
+
+def count_available_cpus(safe_mode: bool = False, r_count: int = 1) -> int:
+    """ Counts no. of detected CPUs in the current system. By default, all 
+        CPU cores detected are returned. However, if safe mode is toggled, then
+        a specified number of cores are reserved.
+    
+    Args:
+        safe_mode (bool): Toggles if cores are reserved
+        r_count (int): No. of cores to reserve
+    Return:
+        No. of usable cores (int)
+    """
+    total_cores_available = psutil.cpu_count(logical=True)
+    reserved_cores = safe_mode * r_count
+    return total_cores_available - reserved_cores
 
 
 def count_available_gpus() -> int:
@@ -156,6 +167,35 @@ def capture_system_snapshot() -> dict:
     }
 
 
+def configure_cpu_allocation(**res_kwargs) -> int:
+    """ Configures no. of CPU cores available to the system. By default, all
+        CPU cores will be allocated.
+
+    Args:
+        res_kwargs: Any custom resource allocations declared by user
+    Returns:
+        CPU cores used (int) 
+    """
+    global CORES_USED
+    cpu_count = res_kwargs.get('cpus')
+    CORES_USED = min(cpu_count, CORES_USED) if cpu_count else CORES_USED
+    return CORES_USED
+
+
+def configure_gpu_allocation(**res_kwargs):
+    """ Configures no. of GPU cores available to the system.
+
+    Args:
+        res_kwargs: Any custom resource allocations declared by user
+    Returns:
+        GPU cores used (int) 
+    """
+    global GPU_COUNT
+    gpu_count = res_kwargs.get('gpus')
+    GPU_COUNT = min(gpu_count, GPU_COUNT) if gpu_count else GPU_COUNT
+    return GPU_COUNT
+
+
 def configure_node_logger(**logger_kwargs) -> WorkerLogger:
     """ Initialises the synergos logger corresponding to the current node type.
         In this case, a WorkerLogger is initialised.
@@ -230,11 +270,10 @@ CUSTOM_DIR = os.path.join(SRC_DIR, "custom")
 TEST_DIR = os.path.join(SRC_DIR, "tests")
 
 # Initialise Cache
-CACHE = infinite_nested_dict() # Cache()
-# THREAD_CONDITION = threading.Condition()
+CACHE = infinite_nested_dict()
 
 # Allocate no. of cores for processes
-CORES_USED = psutil.cpu_count(logical=True) - 1
+CORES_USED = count_available_cpus(safe_mode=True)
 
 # Detect no. of GPUs attached to server
 GPU_COUNT = count_available_gpus()

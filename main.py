@@ -4,12 +4,10 @@
 # Required Modules #
 ####################
 
-# from gevent import monkey
-# monkey.patch_all()
-
 # Generic/Built-in
 import argparse
 import logging
+import os
 import uuid
 from pathlib import Path
 
@@ -19,6 +17,8 @@ from pathlib import Path
 # Custom
 from config import (
     capture_system_snapshot,
+    configure_cpu_allocation,
+    configure_gpu_allocation,
     configure_node_logger, 
     configure_sysmetric_logger
 )
@@ -26,6 +26,8 @@ from config import (
 ##################
 # Configurations #
 ##################
+
+SOURCE_FILE = os.path.abspath(__file__)
 
 SECRET_KEY = "synergos_worker" #os.urandom(24) # secret key
 
@@ -80,6 +82,20 @@ def construct_logger_kwargs(**kwargs) -> dict:
         'censor_keys': censor_keys
     }
 
+
+def construct_resource_kwargs(**kwargs) -> dict:
+    """ Extracts user-parsed values and re-mapping them into parameters 
+        corresponding to resource allocations
+
+    Args:
+        kwargs: Any user input captured 
+    Returns:
+        Resource configurations (dict)
+    """
+    cpus = kwargs['cpus']
+    gpus = kwargs['gpus']
+    return {'cpus': cpus, 'gpus': gpus}
+
 ###########
 # Scripts #
 ###########
@@ -108,6 +124,25 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--logging_resolution",
+        "-r",
+        type=int,
+        help="Interval to wait before system usage is logged again"
+    )   
+
+    parser.add_argument(
+        "--cpus",
+        type=int,
+        help="No. of CPU cores to allocate for this service. If not specified, auto-detect CPU count"
+    )    
+
+    parser.add_argument(
+        "--gpus",
+        type=int,
+        help="No. of GPU cores to allocate for this service. If not specified, auto-detect GPU count"
+    )   
+
+    parser.add_argument(
         '--censored',
         "-c",
         action='store_true',
@@ -125,7 +160,11 @@ if __name__ == "__main__":
 
     input_kwargs = vars(parser.parse_args())
     system_kwargs = capture_system_snapshot()
+    res_kwargs = construct_resource_kwargs(**input_kwargs)
     logger_kwargs = construct_logger_kwargs(**input_kwargs)
+
+    configure_cpu_allocation(**res_kwargs)
+    configure_gpu_allocation(**res_kwargs)
 
     server_id = input_kwargs['id']
     node_logger = configure_node_logger(**logger_kwargs)
@@ -143,7 +182,12 @@ if __name__ == "__main__":
     )
 
     sysmetric_logger = configure_sysmetric_logger(**logger_kwargs)
-    sysmetric_logger.track("/test/path", 'TestClass', 'test_function')
+    sysmetric_logger.track(
+        file_path=SOURCE_FILE,
+        class_name="",
+        function_name="",
+        resolution=input_kwargs['logging_resolution']
+    )
 
     try:
 
@@ -165,17 +209,7 @@ if __name__ == "__main__":
         # [Solution]
         # Import system modules only after loggers have been intialised.
 
-        from rest_rpc import app
-
-        # cache = app.config['CACHE']
-        # cache.init_app(
-        #     app=app, 
-        #     config={
-        #         "CACHE_TYPE": "filesystem",
-        #         'CACHE_DIR': Path('/worker/tmp')
-        #     }
-        # )
-        
+        from rest_rpc import app       
         app.run(host="0.0.0.0", port=5000)
 
     finally:
