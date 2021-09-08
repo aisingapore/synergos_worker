@@ -87,9 +87,8 @@ class Termination(Resource):
         # Search local database for cached operations
         meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
-                
-        if (retrieved_metadata and 
-            expt_run_key in retrieved_metadata['in_progress']):
+
+        if retrieved_metadata:
 
             # Check that only 1 remaining experiment-runs is left in progress
             # (Note: Remaining experiment-run must be this experiment-run)
@@ -143,8 +142,6 @@ class Termination(Resource):
                 ID_function=Termination.post.__name__,
                 **request.view_args
             )
-
-            retrieved_metadata['in_progress'].remove(expt_run_key)
 
             updated_metadata = meta_records.update(
                 project_id=project_id, 

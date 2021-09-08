@@ -181,7 +181,6 @@ class Initialisation(Resource):
         """ 
         # Search local database for cached operations
         meta_records = load_metadata_records(keys=request.view_args)
-
         retrieved_metadata = meta_records.read(project_id)
 
         if retrieved_metadata:
@@ -245,9 +244,6 @@ class Initialisation(Resource):
             if expt_run_key not in retrieved_metadata['connections']:
                 retrieved_metadata['connections'].append(expt_run_key)
                 
-            if expt_run_key not in retrieved_metadata['in_progress']:
-                retrieved_metadata['in_progress'].append(expt_run_key)
-
             updated_metadata = meta_records.update(
                 project_id=project_id, 
                 updates=retrieved_metadata

@@ -254,12 +254,11 @@ class Prediction(Resource):
         meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
         
-        if (retrieved_metadata and 
-            expt_run_key in retrieved_metadata['in_progress']):
+        if retrieved_metadata:
 
             # Assumption: 
             # When inference is in progress, WSSW object is active & is stored
-            # in cache for retrieval/operation
+            # in cache for retrieval/operation + ONLY 1 request made at a time
             wss_worker = cache[project_id]['participant']
 
             logging.debug(
