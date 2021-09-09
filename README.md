@@ -31,13 +31,23 @@
     Please view [this guide](https://docs.synergos.ai/DatasetStructure.html) on how to organise your dataset for federated training, in Synergos Worker.
 
 5) Start up the worker node. Start-up commands can be reduced depending on whether or not you are running the REST-RPC grid in standalone mode, or over a distributed network. In general, it is as follows: 
-
-    > <font color='turquoise'>**docker run <br><font color='red'>-p <host\>:<f_port\>:5000 <br> -p <host\>:<ws_port\>:8020</font><br><font color='orange'>-v /path/to/datasets:/worker/data <br> -v /path/to/outputs:/worker/outputs</font><br> --name <worker_id> synergos_worker:v0.1.0 <br> --logging_variant basic**</font>
+    ```bash
+    docker run \
+        -p <host\>:<f_port\>:5000 \
+        -p <host\>:<ws_port\>:8020 \
+        -v /path/to/datasets:/worker/data \
+        -v /path/to/outputs:/worker/outputs \
+        --name <worker_id\> synergos_worker:v0.1.0 \
+        --logging_variant basic
+    ```
 
     Let's try to break down what is going on here.
 
     A. Port Routes
-    ><font color='red'>-p <host\>:<f_port\>:5000 <br> -p <host\>:<ws_port\>:8020</font>
+    ```bash
+        -p <host\>:<f_port\>:5000
+        -p <host\>:<ws_port\>:8020
+    ```
 
     This section maps the incoming connections into the container. 
     
@@ -61,7 +71,10 @@
     * ws_port - Selected port to route incoming Websocket connections for the PySyft Websocket workers
 
     B. Volume Mounts
-    ><font color='orange'>-v /path/to/datasets:/worker/data <br> -v /path/to/outputs:/worker/outputs</font>
+    ```bash
+        -v /path/to/datasets:/worker/data \
+        -v /path/to/outputs:/worker/outputs
+    ```
 
     Override the internal directories of the containers with the mountable directories you have created.
 
