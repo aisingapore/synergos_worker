@@ -1,28 +1,30 @@
-# Running Dockerised PySyft Worker Node
+# Running Dockerised Synergos Worker
 
 1) **Clone this repository**
-
-    > <font color='turquoise'>**git clone https://github.com/aimakerspace/synergos_worker.git**</font>
+    ```bash
+    git clone https://github.com/aimakerspace/synergos_worker.git
+    ```
 
 2) **Navigate into the repository**
-
-    > <font color='turquoise'>**cd ./synergos_worker**</font>
+    ```bash
+    cd ./synergos_worker
+    ```
  
 3) **Checkout to stable tag**
-
-    > <font color='turquoise'>**git checkout tags/v0.1.0**</font>
+    ```bash
+    git checkout tags/v0.1.0
+    ```
      
 3) **Update Submodule**
     ```bash
     git submodule update --init --recursive
     git submodule update --recursive --remote
     ```
-    <!-- > <font color='turquoise'>**git submodule update --init --recursive**</font>
-    > <font color='turquoise'>**git submodule update --recursive --remote**</font> -->
 
 3) **Build image using the following command(s):** 
-
-    > <font color='turquoise'>**docker build -t synergos_worker:v0.1.0 --label "WebsocketServerWorker" .**</font>
+    ```bash
+    docker build -t synergos_worker:v0.1.0 --label "WebsocketServerWorker" .
+    ```
 
 4) **Set up the appropriate mountpoint directories.**
 
