@@ -33,11 +33,11 @@
 5) Start up the worker node. Start-up commands can be reduced depending on whether or not you are running the REST-RPC grid in standalone mode, or over a distributed network. In general, it is as follows: 
     ```bash
     docker run \
-        -p <host\>:<f_port\>:5000 \
-        -p <host\>:<ws_port\>:8020 \
+        -p <host>:<f_port>:5000 \
+        -p <host>:<ws_port>:8020 \
         -v /path/to/datasets:/worker/data \
         -v /path/to/outputs:/worker/outputs \
-        --name <worker_id\> synergos_worker:v0.1.0 \
+        --name <worker_id> synergos_worker:v0.1.0 \
         --logging_variant basic
     ```
 
@@ -45,8 +45,8 @@
 
     A. Port Routes
     ```bash
-        -p <host\>:<f_port\>:5000
-        -p <host\>:<ws_port\>:8020
+        -p <host>:<f_port>:5000
+        -p <host>:<ws_port>:8020
     ```
 
     This section maps the incoming connections into the container. 
