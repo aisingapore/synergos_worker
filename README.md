@@ -9,19 +9,25 @@
     > <font color='turquoise'>**cd ./synergos_worker**</font>
  
 3) **Checkout to stable tag**
+
     > <font color='turquoise'>**git checkout tags/v0.1.0**</font>
      
 3) **Update Submodule**
-    > <font color='turquoise'>**git submodule update --init --recursive**</font>
-    > <font color='turquoise'>**git submodule update --recursive --remote**</font>
+    ```bash
+    git submodule update --init --recursive
+    git submodule update --recursive --remote
+    ```
+    <!-- > <font color='turquoise'>**git submodule update --init --recursive**</font>
+    > <font color='turquoise'>**git submodule update --recursive --remote**</font> -->
 
 3) **Build image using the following command(s):** 
 
     > <font color='turquoise'>**docker build -t synergos_worker:v0.1.0 --label "WebsocketServerWorker" .**</font>
 
 4) **Set up the appropriate mountpoint directories.**
+
     Please view [this guide](https://docs.synergos.ai/DatasetStructure.html) on how to organise your dataset for federated training, in Synergos Worker.
-    
+
 5) Start up the worker node. Start-up commands can be reduced depending on whether or not you are running the REST-RPC grid in standalone mode, or over a distributed network. In general, it is as follows: 
 
     > <font color='turquoise'>**docker run <br><font color='red'>-p <host\>:<f_port\>:5000 <br> -p <host\>:<ws_port\>:8020</font><br><font color='orange'>-v /path/to/datasets:/worker/data <br> -v /path/to/outputs:/worker/outputs</font><br> --name <worker_id> synergos_worker:v0.1.0 <br> --logging_variant basic**</font>
@@ -64,8 +70,8 @@
     - [Synergos Basic Distributed Grid i.e. across multiple devices](https://docs.synergos.ai/BasicRunDistributed.html)
     - [Synergos Cluster Distributed Grid i.e. across multiple devices](https://docs.synergos.ai/ClusterRunDistributed.html)
     - [Example Datasets and Jupyter Notebooks](https://github.com/aimakerspace/Synergos/tree/master/examples)
-<!--     
-    Here are some examples to get you started. 
+    
+    <!-- Here are some examples to get you started. 
     
     I. Standalone Grid (i.e. local)
 
@@ -82,8 +88,8 @@
     For a guided tutorial, 
     1. Download worker inputs [here](https://drive.google.com/drive/folders/1hSoOq1z-Lo3w-qUrFbsoPITzIyYWivvD?usp=sharing)
     2. Download test datasets [here](https://drive.google.com/drive/folders/19C9m6XEPHeEMIwmPRajX5-UBNujGOdtM?usp=sharing)
-    3. Refer to this [guide](https://gitlab.int.aisingapore.org/aims/federatedlearning/fedlearn-prototype/-/wikis/PySyft/How-to-run-jobs-in-PySyft). -->
-    <!-- A. Datasets
+    3. Refer to this [guide](https://gitlab.int.aisingapore.org/aims/federatedlearning/fedlearn-prototype/-/wikis/PySyft/How-to-run-jobs-in-PySyft).
+    A. Datasets
 
     > <font color='turquoise'>**/datasets <br>&ensp;&ensp;&ensp;&ensp; <font color='red'>/tabular <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; metadata.json <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; tabular_data.csv <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; schema.json</font><br>&ensp;&ensp;&ensp;&ensp; <font color='orange'>/image <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; metadata.json <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; /label_class_0 <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_1.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_2.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_3.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; /label_class_1 <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_4.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_5.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_6.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; /label_class_2 <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_7.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_8.png <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; image_9.png</font> <br> &ensp;&ensp;&ensp;&ensp; <font color='violet'>/text <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; metadata.json <br>&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp;&ensp; text_corpus.csv**</font></font>
 
@@ -249,9 +255,9 @@
     
     > <font color='turquoise'>**/outputs <br>&ensp;&ensp;&ensp;&ensp;< no structural requirements >**</font>
 
-    There are no structural requirements for the `outputs` directory. This internal directory is meant to be overridden by your own data directory (refer to section 5 for more information) -->
+    There are no structural requirements for the `outputs` directory. This internal directory is meant to be overridden by your own data directory (refer to section 5 for more information)
 
-<!-- 6) Payload Submissions
+6) Payload Submissions
 
     In order for the TTP to complete the connection, these are 3 payloads that MUST be submitted to the TTP's REST service and they are as follows:
 
