@@ -27,7 +27,9 @@ Under the hood, we see that every feature embedded within each Synergos componen
 
 Here's a quick breakdown of the various functions embedded within **Synergos Worker**:
 - REST-RPC orchestration with [Synergos TTP](https://github.com/aimakerspace/synergos_ttp)
-- Auto-downloading of results
+- Grid alignment of datasets
+- Metrics generation
+- Result management
 - Centrialized logging
 - Data cataloguing (coming soon!)
 
