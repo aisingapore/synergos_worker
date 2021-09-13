@@ -5,23 +5,17 @@
 ####################
 
 # Generic/Built-in
-import asyncio
 import logging
 import os
-import signal
-from pathlib import Path
 
 # Libs
-import jsonschema
-import numpy as np
-import websockets
 from flask import request
-from flask_restx import Namespace, Resource, fields
+from flask_restx import Namespace, Resource
 
 # Custom
 from rest_rpc import app
 from rest_rpc.core.server import load_metadata_records
-from rest_rpc.core.utils import Payload, construct_combination_key
+from rest_rpc.core.utils import Payload
 from rest_rpc.initialise import cache, init_output_model
 
 ##################
@@ -82,57 +76,51 @@ class Termination(Resource):
                 }
             }
         """
-        expt_run_key = construct_combination_key(expt_id, run_id)
-
         # Search local database for cached operations
         meta_records = load_metadata_records(keys=request.view_args)
         retrieved_metadata = meta_records.read(project_id)
 
         if retrieved_metadata:
 
-            # Check that only 1 remaining experiment-runs is left in progress
-            # (Note: Remaining experiment-run must be this experiment-run)
-            if len(retrieved_metadata['in_progress']) == 1:
+            project = cache.pop(project_id)
+            wssw_process = project['process']
+            wss_worker = project['participant']
 
-                project = cache.pop(project_id)
-                wssw_process = project['process']
-                wss_worker = project['participant']
+            wss_worker.remove_worker_from_local_worker_registry()
 
-                wss_worker.remove_worker_from_local_worker_registry()
+            if wss_worker.loop.is_running():
+                wss_worker.loop.call_soon_threadsafe(
+                    wss_worker.loop.stop
+                ).call_soon_threadsafe(
+                    wss_worker.loop.close
+                )
+                assert not wss_worker.loop.is_running()
+                
+            if wssw_process.is_alive():
+                wssw_process.terminate()    # end the process
+                wssw_process.join()         # reclaim resources from thread   
 
-                if wss_worker.loop.is_running():
-                    wss_worker.loop.call_soon_threadsafe(
-                        wss_worker.loop.stop
-                    ).call_soon_threadsafe(
-                        wss_worker.loop.close
-                    )
-                    assert not wss_worker.loop.is_running()
-                    
-                if wssw_process.is_alive():
-                    wssw_process.terminate()    # end the process
-                    wssw_process.join()         # reclaim resources from thread
+                logging.info(
+                    f"WSSW process {wssw_process.pid} has been terminated.",
+                    wssw_process_id=wssw_process.pid,
+                    ID_path=SOURCE_FILE,
+                    ID_class=Termination.__name__, 
+                    ID_function=Termination.post.__name__,
+                    **request.view_args
+                )
+                logging.info(
+                    f"Terminated process exitcode: {wssw_process.exitcode}", 
+                    wssw_process_exitcode=wssw_process.exitcode,
+                    ID_path=SOURCE_FILE,
+                    ID_class=Termination.__name__, 
+                    ID_function=Termination.post.__name__,
+                    **request.view_args
+                )
+                
+                assert not wssw_process.is_alive()
+                wssw_process.close()        # release resources immediately
 
-                    logging.info(
-                        f"WSSW process {wssw_process.pid} has been terminated.",
-                        wssw_process_id=wssw_process.pid,
-                        ID_path=SOURCE_FILE,
-                        ID_class=Termination.__name__, 
-                        ID_function=Termination.post.__name__,
-                        **request.view_args
-                    )
-                    logging.info(
-                        f"Terminated process exitcode: {wssw_process.exitcode}", 
-                        wssw_process_exitcode=wssw_process.exitcode,
-                        ID_path=SOURCE_FILE,
-                        ID_class=Termination.__name__, 
-                        ID_function=Termination.post.__name__,
-                        **request.view_args
-                    )
-                    
-                    assert not wssw_process.is_alive()
-                    wssw_process.close()  
-
-                retrieved_metadata['is_live'] = False
+            retrieved_metadata['is_live'] = False
 
             logging.info(
                 f"Termination - Current state of Cache tracked.", 

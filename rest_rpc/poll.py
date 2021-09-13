@@ -5,17 +5,14 @@
 ####################
 
 # Generic/Built-in
-import json
 import logging
 import multiprocessing as mp
 import os
-from pathlib import Path
-from queue import Queue
+import time
 from threading import Thread
 from typing import Dict
 
 # Libs
-import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
 
@@ -122,7 +119,6 @@ def run_archival_jobs(job_queue):
 
             # job_queue.task_done()
 
-        import time
         time.sleep(1)
 
 ### Method 1: Multiprocessing ####
@@ -560,9 +556,7 @@ class Poll(Resource):
                     'schemas': {},
                     'metadata': {},
                     'exports': {},
-                    'process': None,    # process ID hosting WSSW
                     'is_live': False,   # state of WSSW
-                    'in_progress': [],  # cycle combination(s) queued
                     'connections': [],
                     'results': {}
                 }

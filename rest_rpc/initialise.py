@@ -6,11 +6,8 @@
 
 # Generic/Built-in
 import os
-from pathlib import Path
 
 # Libs
-import jsonschema
-import numpy as np
 from flask import request
 from flask_restx import Namespace, Resource, fields
 
@@ -18,7 +15,7 @@ from flask_restx import Namespace, Resource, fields
 from rest_rpc import app
 from rest_rpc.core.server import load_metadata_records, start_proc
 from rest_rpc.core.utils import Payload, construct_combination_key
-from rest_rpc.poll import tag_model, schema_model
+from rest_rpc.poll import tag_model
 from rest_rpc.align import alignment_model
 
 ##################
